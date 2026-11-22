@@ -1,6 +1,8 @@
 # 11 月 21—22 日开发记录
 
-实际执行：2026 年 11 月 22 日。计划第一个日期段的工程开发已实现并通过下述自测；团队审查、远程 Issue 和 PR 尚未完成，不将自测冒充团队验收。没有追溯填报 11 月 21 日的开发活动。
+实际执行：2026 年 11 月 22 日。计划第一个日期段的工程开发已实现并通过下述自测；已创建统一 Issue、推送到个人 Fork 并提交 Draft PR，非作者审查与团队验收仍待完成。没有追溯填报 11 月 21 日的开发活动。
+
+任务：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)。代码：[功能实现提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)。审查：[Draft PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此通过个人 Fork 提交 PR。
 
 ## 本地任务单 D1-001
 
@@ -17,7 +19,7 @@
 | D1-05 | 数据库写入、审计与独立进程重启恢复 | 自测通过 | process-smoke.json、browser.json |
 | D1-06 | 版本化接口草案与六状态规则 | 草案入库，待团队确认 | API-v1.md、RULES.md |
 | D1-07 | 启动说明、实际环境与测试证据 | 自测通过 | README、evidence/ |
-| D1-08 | 远程 Issue、PR 和非作者审查 | 待团队执行 | 下方交接步骤 |
+| D1-08 | 远程 Issue、PR 和非作者审查 | Issue 与 Draft PR 已创建，审查待完成 | Issue #1、PR #2 |
 
 ## 实测结果
 
@@ -39,7 +41,7 @@ Windows x64；Python 3.10.0、SQLite 3.35.5、Flask 3.1.3、Werkzeug 3.1.9、pyt
 
 最初系统 `python` / `python3` 指向不可用的 Windows 应用别名；改用实际 Python 路径创建虚拟环境。直连 GitHub 超时，通过本机配置的 HTTP 代理取得参考仓库。Python 依赖使用 HTTPS 清华 PyPI 镜像安装。pytest 9.2.0 在本机收集时出现内部错误，改用 8.3.5 后测试全部通过。首次沙箱内 HTTP 验收无法连通，在与服务相同的本机执行环境复跑通过。上述尝试未被计入通过结果。
 
-参考仓库基线：`931a0c6f36798b0f86378d48bf2962cc09db3aa2`。开发分支：`feat/alpha-day1-foundation`。最终本地提交号通过 `git log -1 --oneline` 查看，源码 ZIP 使用该提交导出。
+参考仓库基线：`931a0c6f36798b0f86378d48bf2962cc09db3aa2`。开发分支：`feat/alpha-day1-foundation`，功能实现提交 `fd335ba` 已推送至 `832402123wuyiming/studyseat-prototype`。文档同步可有后续提交，最新版本通过 `git log -1 --oneline` 查看。
 
 ## 燃起数据
 
@@ -47,6 +49,6 @@ Windows x64；Python 3.10.0、SQLite 3.35.5、Flask 3.1.3、Werkzeug 3.1.9、pyt
 
 ## 交接与限制
 
-团队可将本任务单复制为远程 Issue，指派实际负责人，将本地分支推送到有权限的仓库并建立 PR；由非作者检查登录、权限、重启和接口草案，再标记验收。这些是尚待团队执行的协作步骤，本次未远程发帖、推送、合并或发布。
+本任务单已对应原仓库 Issue #1，功能分支已推送至个人 Fork 并向原仓库提交 Draft PR #2。尚需团队认领负责人，由非作者检查登录、权限、重启和接口草案，再标记验收。本次未合并 PR 或公开部署服务。
 
 剩余开发按下一日期段推进：可用性查询、创建/取消、个人预约、幂等、座位和学生两类并发冲突；之后再做状态迁移和管理端写入。本阶段没有后台超时任务、生产登录限速、性能达标证明或公开部署。资源关闭规则与旧 SRS 的差异仍待团队确认。已存数据库索引与唯一幂等键不构成重叠冲突保障。

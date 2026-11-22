@@ -84,4 +84,6 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 
 接口与后续预约契约见 [docs/API-v1.md](docs/API-v1.md)，规则口径见 [docs/RULES.md](docs/RULES.md)，阶段任务、实测和限制见 [docs/DAY1.md](docs/DAY1.md)。
 
-当前为本地开发与课程验收服务。预约事务、签到、超时任务、管理员规则写入和资源关闭尚未实现；预约相关表只有结构，不代表业务通过。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。未执行互联网部署、远程 Issue 创建或远程推送；非作者审查需由团队成员完成。
+当前为本地开发与课程验收服务。预约事务、签到、超时任务、管理员规则写入和资源关闭尚未实现；预约相关表只有结构，不代表业务通过。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。
+
+任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[Draft PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。非作者审查与团队正式验收待完成；未合并或公开部署。

@@ -130,8 +130,11 @@ def main():
             ],
             "scope": "Persistence notes, not reservations",
         }
-        target = ROOT / "evidence" / "process-smoke.json"
-        target.parent.mkdir(exist_ok=True)
+        target = (
+            Path(os.environ.get("STUDYSEAT_EVIDENCE_DIR", str(ROOT / "evidence")))
+            / "process-smoke.json"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps(report, ensure_ascii=False, indent=2))
 

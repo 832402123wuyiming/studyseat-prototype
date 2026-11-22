@@ -5,9 +5,9 @@ const { chromium } = require('playwright');
 
 (async () => {
   const baseURL = process.env.STUDYSEAT_TEST_URL || 'http://127.0.0.1:5057';
-  const evidence = path.resolve(__dirname, '../evidence');
+  const evidence = process.env.STUDYSEAT_EVIDENCE_DIR ? path.resolve(process.env.STUDYSEAT_EVIDENCE_DIR) : path.resolve(__dirname, '../evidence');
   fs.mkdirSync(evidence, { recursive: true });
-  const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+  const browser = await chromium.launch({ headless: true, channel: process.env.STUDYSEAT_BROWSER_CHANNEL || 'msedge' });
   const context = await browser.newContext({ viewport: { width: 1360, height: 1000 } });
   const page = await context.newPage();
   const errors = [];

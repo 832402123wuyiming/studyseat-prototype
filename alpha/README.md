@@ -80,6 +80,8 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 
 ## 代码与交接
 
+账号切换失败与延迟响应的补充回归：在独立测试数据库启动服务，设置 `STUDYSEAT_TEST_URL` 后从仓库根目录运行 `node alpha/tests/account-switch.cjs`。默认 Edge，可用 `STUDYSEAT_BROWSER_CHANNEL` 选择实际安装的浏览器；结果保存到 `alpha/evidence/account-switch/`。原浏览器脚本和进程重启脚本支持 `STUDYSEAT_EVIDENCE_DIR` 将本轮结果另存，保留历史报告。修复与实际验证见 [账号切换复核报告](docs/ACCOUNT-SWITCH-REVIEW.md)。
+
 `studyseat/api.py` 处理 HTTP；`auth.py` 处理认证、会话和权限；`db.py` 管理每请求独立连接与统一写事务；`schema.sql` 定义 v1 数据结构；`seed.py` 管理公开初始化数据。所有写入口使用 `BEGIN IMMEDIATE`，失败回滚，锁等待上限 5 秒，锁忙返回 503 和重试提示。数据库新增版本需新迁移，不能仅修改旧表声明。
 
 接口与后续预约契约见 [docs/API-v1.md](docs/API-v1.md)，规则口径见 [docs/RULES.md](docs/RULES.md)，阶段任务、实测和限制见 [docs/DAY1.md](docs/DAY1.md)。

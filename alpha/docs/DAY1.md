@@ -1,8 +1,8 @@
 # 11 月 21—22 日开发记录
 
-实际执行：2026 年 11 月 22 日。计划第一个日期段的工程开发已实现并通过下述自测；已创建统一 Issue、推送到个人 Fork 并提交 Draft PR，非作者审查与团队验收仍待完成。没有追溯填报 11 月 21 日的开发活动。
+实际执行：2026 年 11 月 22 日。计划第一个日期段的工程开发已实现并通过下述自测；已创建统一 Issue、推送到个人 Fork 并提交 PR，AI 技术复核和缺陷修复已完成，非作者批准与团队验收仍待完成。没有追溯填报 11 月 21 日的开发活动。
 
-任务：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)。代码：[功能实现提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)。审查：[Draft PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此通过个人 Fork 提交 PR。
+任务：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)。代码：[功能实现提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)。审查：[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。技术复核：[报告](REVIEW-D1-001.md)。当前账号对原仓库只有读取权限，因此通过个人 Fork 提交 PR。
 
 ## 本地任务单 D1-001
 
@@ -19,13 +19,14 @@
 | D1-05 | 数据库写入、审计与独立进程重启恢复 | 自测通过 | process-smoke.json、browser.json |
 | D1-06 | 版本化接口草案与六状态规则 | 草案入库，待团队确认 | API-v1.md、RULES.md |
 | D1-07 | 启动说明、实际环境与测试证据 | 自测通过 | README、evidence/ |
-| D1-08 | 远程 Issue、PR 和非作者审查 | Issue 与 Draft PR 已创建，审查待完成 | Issue #1、PR #2 |
+| D1-08 | 远程 Issue、PR 和非作者审查 | Issue 与 PR 已创建，AI 技术复核完成，非作者批准待完成 | Issue #1、PR #2、技术复核报告 |
 
 ## 实测结果
 
 | 验证 | 结果 |
 | --- | --- |
 | 后端 pytest | 25 passed；JUnit 在 evidence/pytest.xml |
+| 本轮技术复核 | 修复 4 类问题，补充 9 个回归场景后 34 passed；JUnit 在 evidence/pytest-review.xml |
 | Ruff 检查和格式 | 通过；配置已入库 |
 | 真实 HTTP 双进程 | 通过；不同 PID、同一数据库，会话及验证文本恢复，管理审计可见 |
 | Edge 浏览器 | 11 个检查通过；桌面与 390px 移动端、错误密码、学生隔离、403、刷新、退出及管理员审计 |
@@ -49,6 +50,6 @@ Windows x64；Python 3.10.0、SQLite 3.35.5、Flask 3.1.3、Werkzeug 3.1.9、pyt
 
 ## 交接与限制
 
-本任务单已对应原仓库 Issue #1，功能分支已推送至个人 Fork 并向原仓库提交 Draft PR #2。尚需团队认领负责人，由非作者检查登录、权限、重启和接口草案，再标记验收。本次未合并 PR 或公开部署服务。
+本任务单已对应原仓库 Issue #1，功能分支已推送至个人 Fork 并向原仓库提交 PR #2。AI 技术复核已完成，并修复 4 类问题；尚需团队认领负责人、非作者批准与规则草案确认，再标记验收。本次未合并 PR 或公开部署服务。
 
 剩余开发按下一日期段推进：可用性查询、创建/取消、个人预约、幂等、座位和学生两类并发冲突；之后再做状态迁移和管理端写入。本阶段没有后台超时任务、生产登录限速、性能达标证明或公开部署。资源关闭规则与旧 SRS 的差异仍待团队确认。已存数据库索引与唯一幂等键不构成重叠冲突保障。

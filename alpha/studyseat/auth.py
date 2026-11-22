@@ -68,14 +68,22 @@ def new_session(connection, user_id=None):
             expires.isoformat(timespec="microseconds").replace("+00:00", "Z"),
         ),
     )
+    return token, csrf
+
+
+def activate_session(token):
+    # Publish the new cookie only after the database transaction has committed.
     session.clear()
     session["sid"] = token
-    return csrf
 
 
 def check_csrf():
     supplied = request.headers.get("X-CSRF-Token", "")
-    if not g.auth_session or not secrets.compare_digest(supplied, g.auth_session["csrf_token"]):
+    if (
+        not g.auth_session
+        or not supplied.isascii()
+        or not secrets.compare_digest(supplied, g.auth_session["csrf_token"])
+    ):
         raise ApiError(403, "CSRF_INVALID", "页面凭据已失效，请刷新后重试。")
 
 

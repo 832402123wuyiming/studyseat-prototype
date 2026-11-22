@@ -61,7 +61,7 @@ def create_app(test_config=None):
     def api_error(error):
         return jsonify(error={"code": error.code, "message": error.message}), error.status
 
-    @app.errorhandler(sqlite3.OperationalError)
+    @app.errorhandler(sqlite3.DatabaseError)
     def database_error(error):
         locked = "locked" in str(error).lower() or "busy" in str(error).lower()
         app.logger.error("Database operation failed: %s", type(error).__name__)

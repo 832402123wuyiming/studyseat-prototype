@@ -3,7 +3,7 @@ import uuid
 
 from flask import Blueprint, g, jsonify, render_template, request
 
-from .auth import ApiError, authenticate, check_csrf, new_session, require_role
+from .auth import ApiError, activate_session, authenticate, check_csrf, new_session, require_role
 from .db import get_db, utc_now, write_transaction
 
 bp = Blueprint("api", __name__)
@@ -20,6 +20,16 @@ def json_body():
     return body
 
 
+def valid_text(value, maximum):
+    if not isinstance(value, str) or not 1 <= len(value) <= maximum or "\x00" in value:
+        return False
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
 @bp.get("/")
 def index():
     return render_template("index.html")
@@ -27,7 +37,11 @@ def index():
 
 @bp.get("/api/v1/health")
 def health():
-    get_db().execute("SELECT version FROM schema_versions WHERE version=1").fetchone()
+    connection = get_db()
+    version = connection.execute("PRAGMA user_version").fetchone()[0]
+    recorded = connection.execute("SELECT version FROM schema_versions WHERE version=1").fetchone()
+    if version != 1 or recorded is None:
+        raise ApiError(503, "DATABASE_UNAVAILABLE", "数据库版本未就绪，请检查初始化。")
     return ok({"status": "ok", "schema_version": 1, "server_time": utc_now()})
 
 
@@ -35,7 +49,8 @@ def health():
 def auth_session():
     if not g.auth_session:
         with write_transaction() as connection:
-            csrf = new_session(connection)
+            token, csrf = new_session(connection)
+        activate_session(token)
     else:
         csrf = g.auth_session["csrf_token"]
     return ok({"user": g.identity, "csrf_token": csrf})
@@ -46,20 +61,16 @@ def login():
     check_csrf()
     body = json_body()
     username, password = body.get("username"), body.get("password")
-    if (
-        not isinstance(username, str)
-        or not isinstance(password, str)
-        or not 1 <= len(username) <= 100
-        or not 1 <= len(password) <= 256
-    ):
+    if not valid_text(username, 100) or not valid_text(password, 256):
         raise ApiError(400, "INVALID_INPUT", "请输入账号和密码。")
     user = authenticate(username, password)
     with write_transaction() as connection:
-        csrf = new_session(connection, user["id"])
+        token, csrf = new_session(connection, user["id"])
         connection.execute(
             "INSERT INTO audit_events(actor_id,action,target_id,occurred_at) VALUES (?,?,?,?)",
             (user["id"], "LOGIN", user["id"], utc_now()),
         )
+    activate_session(token)
     return ok({"user": user, "csrf_token": csrf})
 
 
@@ -68,7 +79,8 @@ def login():
 def logout():
     check_csrf()
     with write_transaction() as connection:
-        csrf = new_session(connection)
+        token, csrf = new_session(connection)
+    activate_session(token)
     return ok({"user": None, "csrf_token": csrf})
 
 
@@ -119,7 +131,7 @@ def list_notes():
 def add_note():
     check_csrf()
     content = json_body().get("content")
-    if not isinstance(content, str) or not 1 <= len(content.strip()) <= 200:
+    if not isinstance(content, str) or not valid_text(content.strip(), 200):
         raise ApiError(400, "INVALID_INPUT", "验证文本应为 1 至 200 个字符。")
     note = {
         "id": str(uuid.uuid4()),

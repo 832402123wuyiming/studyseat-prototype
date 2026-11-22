@@ -6,3 +6,11 @@ playwright-report/
 test-results/
 .env
 .env.*
+!alpha/.env.example
+.venv/
+.pytest_cache/
+.ruff_cache/
+alpha/instance/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

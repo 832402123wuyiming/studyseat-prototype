@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Study Seat · 知行有座</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header><a href="/" class="brand"><span class="brand-icon">S</span> Study Seat <small>知行有座</small></a><span class="badge">ALPHA · 01</span></header>
+  <main>
+    <section class="intro"><p class="eyebrow">给专注留一个位置</p><h1>每一次出发，<br>都有座可期。</h1><p>连接校园自习空间，让学习从容开始。</p><div class="illustration" aria-hidden="true"><div class="window">✦</div><div class="books"></div><div class="desk"></div><div class="chair"></div></div><div class="milestones"><span>01 账号与数据基础</span><span>02 预约与冲突控制</span><span>03 使用与管理联动</span></div></section>
+    <section class="panel">
+      <div id="loading">正在连接服务…</div>
+      <div id="login-view" hidden>
+        <p class="eyebrow">欢迎回来</p><h2>登录 Study Seat</h2><p class="muted">使用公开测试账号体验首阶段版本</p>
+        <form id="login-form">
+          <label for="username">账号</label><input id="username" name="username" autocomplete="username" required maxlength="100" placeholder="请输入学生或管理员账号">
+          <label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="请输入密码">
+          <button type="submit">登录</button>
+        </form>
+        <details><summary>查看公开测试账号</summary><p>学生 A：832402116 / 123456<br>学生 B：student02 / Study1234<br>管理员：admin01 / Admin1234</p></details>
+        <p class="notice">首阶段已接入数据库与服务端权限。预约、签到和资源关闭将在后续阶段开放。</p>
+      </div>
+      <div id="dashboard" hidden>
+        <div class="row"><p class="eyebrow">账号工作台</p><button id="logout" class="secondary">退出登录</button></div>
+        <h2 id="welcome"></h2><p id="identity" class="muted"></p>
+        <div id="rules" class="notice"></div>
+        <h3>校园自习空间</h3><div id="rooms" class="rooms"></div>
+        <h3>数据持久化验证</h3><p class="muted">保存一条文本后刷新，或重启服务再登录查看。这些是验证记录，不是预约。</p>
+        <form id="note-form"><label for="note">验证文本</label><input id="note" maxlength="200" required placeholder="例如：第一次运行验证"><button type="submit">保存到数据库</button></form>
+        <ul id="notes"></ul>
+        <div id="admin" hidden><h3>管理操作记录</h3><p class="muted">与学生端共用同一数据库，显示最近 100 条事件。</p><ul id="events"></ul></div>
+      </div>
+      <p id="status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <footer><span>Study Seat · 智慧校园自习室</span><span>11 月 21—22 日阶段 · 真实数据基础</span></footer>
+</body>
+</html>

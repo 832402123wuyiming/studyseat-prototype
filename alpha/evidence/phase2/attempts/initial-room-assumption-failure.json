@@ -1,0 +1,5 @@
+{
+  "result": "failed",
+  "completed_checks": [],
+  "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n63 !== 119\n\n    at /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/reservations-browser.cjs:92:12"
+}

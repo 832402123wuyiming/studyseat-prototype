@@ -1,0 +1,5 @@
+{
+  "result": "failed",
+  "passed": [],
+  "message": "Expected values to be strictly equal:\n\n'你好，申子衡' !== ''\n"
+}

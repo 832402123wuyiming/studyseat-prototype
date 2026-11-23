@@ -1,0 +1,16 @@
+{
+  "result": "failed",
+  "scenario": "B-old-seats-after-new-query",
+  "completed": [
+    {
+      "name": "A-delayed-rooms-input",
+      "result": "passed"
+    }
+  ],
+  "state": {
+    "rooms": 4,
+    "status": "",
+    "reservations": "图书馆 3F 自习室 A101 · A01 · 2026/11/24 09:00:00 — 2026/11/24 10:00:00（北京时间）· 已取消 · 规则 v1"
+  },
+  "error": "route.fulfill: Route is already handled!\n    at page.route.times (/Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/initialization-browser.cjs:51:19)"
+}

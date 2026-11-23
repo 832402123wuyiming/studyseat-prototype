@@ -26,16 +26,17 @@
       <div id="dashboard" hidden>
         <div class="row"><p class="eyebrow">账号工作台</p><button id="logout" class="secondary">退出登录</button></div>
         <h2 id="welcome"></h2><p id="identity" class="muted"></p>
+        <p id="initialization-state" role="status"></p><button id="reload-dashboard" class="secondary" hidden>重新加载工作台</button>
         <div id="rules" class="notice"></div>
         <h3>校园自习空间</h3><div id="rooms" class="rooms"></div>
         <section id="student-booking" hidden>
           <h3>查找可预约座位</h3><p class="muted">时间均为北京时间。查询结果仅供参考，提交时服务端重新校验；本人已有重叠预约时不返回可预约座位。</p>
-          <form id="search-form">
+          <form id="search-form"><fieldset id="search-fields" disabled>
             <label for="room-id">房间</label><select id="room-id" required></select>
             <label for="start-at">开始时间（北京时间）</label><input id="start-at" type="datetime-local" step="60" required>
             <label for="end-at">结束时间（北京时间）</label><input id="end-at" type="datetime-local" step="60" required>
             <button type="submit">查询可预约座位</button>
-          </form>
+          </fieldset></form>
           <p id="availability" role="status">请先查询。</p>
           <form id="booking-form" hidden><label for="seat-id">可预约座位</label><select id="seat-id" required></select><button type="submit">创建预约</button></form>
           <div class="row"><h3>我的预约</h3><button id="reload-reservations" class="secondary">刷新预约</button></div>

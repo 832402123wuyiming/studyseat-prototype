@@ -28,7 +28,7 @@
 
 ## 自动化验证
 
-在 alpha 下安装 requirements-dev.txt；Node 安装根 package.json 的 Playwright 依赖。选择实际安装的浏览器：Windows 默认 msedge，macOS 可设 STUDYSEAT_BROWSER_CHANNEL=chrome。运行 `python scripts/verify_phase2.py`。支持 STUDYSEAT_NODE、NODE_PATH 和 STUDYSEAT_EVIDENCE_DIR。此脚本执行 pytest、Ruff、JS 语法、原型单测、真实进程重启、三组 Alpha 浏览器和临时导出副本中的原型浏览器。所有服务仅绑定 127.0.0.1；结束清理临时服务及数据库，不启动长期服务。
+在 alpha 下安装 requirements-dev.txt；Node 安装根 package.json 的 Playwright 依赖。选择实际安装的浏览器：Windows 默认 msedge，macOS 可设 STUDYSEAT_BROWSER_CHANNEL=chrome。运行 `python scripts/verify_phase2.py`。支持 STUDYSEAT_NODE、NODE_PATH 和 STUDYSEAT_EVIDENCE_DIR。此脚本执行 pytest、Ruff、JS 语法、原型单测、真实进程重启、四组 Alpha 浏览器（含初始化回归）和临时导出副本中的原型浏览器。所有服务仅绑定 127.0.0.1；结束清理临时服务及数据库，不启动长期服务。
 
 独立运行：`python -m pytest -q --junitxml=evidence/phase2/pytest.xml`、`python -m ruff check .`、`python -m ruff format --check .`、`STUDYSEAT_EVIDENCE_DIR=evidence/phase2/restart python scripts/process_smoke.py`。根目录可运行 `node --test tests/*.test.cjs`。浏览器可针对独立测试库服务分别执行 alpha/tests/browser.cjs、account-switch.cjs、reservations-browser.cjs；不要指向日常数据库。
 
@@ -68,3 +68,37 @@
 没有实现签到、暂离、超时任务、管理规则写入或资源关闭接口。遗留未签到记录不自动迁移状态，其原始区间结束后不阻塞未来时段。原型既有模拟状态操作仍仅供原型演示，不等于 Alpha 实现。
 
 提前 7 天采用北京时间日历日期边界，取消采用待签到状态口径，均已写明并测试；正式制度仍需团队确认。非作者审查、团队验收及后续阶段开发待执行。当前为本地课程验收版本，生产部署工作不在此次范围。
+
+## P2 独立审查前端初始化修复
+
+审查基线 fd6027e44e7587d7564245e26c4bd0b17b7e6114，修复前检查分支 codex/phase2-reservations，工作区干净，没有后续修复。新增浏览器用例先在原 app.js 上复现：登录时暂停 GET /rooms 的真实 200 响应，在已显示表单中修改开始和结束时间，释放后房间选项为 0，状态提示为空。断言期望 4 实得 0；[修复前结果](../evidence/initialization-review/pre-fix/initialization-browser/failure.json) 与截图保留，未计为通过。
+
+原因是时间/房间 input 和初始化共用全局 generation。修复将全局代次限定为身份切换，新增座位查询代次，条件编辑只使旧余量响应失效。API 在处理错误、CSRF 和返回数据之前同时检查身份与查询有效性。旧账号记录、审计、预约和会话响应继续由身份代次隔离。按钮使用每次操作独立标识，避免旧查询 finally 启用新查询占用的按钮；保留同载荷幂等重试、查询加载与错误反馈。
+
+查询控件置于初始 disabled 的 fieldset 中，房间、规则和用户数据成功加载后才启用。初始化失败显示服务端错误与“重新加载工作台”入口，重试完整初始化；“刷新预约”仍只刷新本人列表。未更改接口、规则或数据库。
+
+新增 alpha/tests/initialization-browser.cjs 并接入完整验证器：A 暂缓真实房间响应，尝试编辑时间（禁用时检查控件并注入 input 验证独立失效范围），释放后初始化、查询、真实创建与取消通过；B 两种新旧响应交付顺序，旧余量不覆盖新条件，旧操作清理不启用仍在加载的新按钮，旧查询读取失败也不覆盖新提示；C 预约列表加载期间编辑查询条件，列表仍完成；E 房间 503 的明确错误与重新加载恢复。所有延迟使用受控 Promise、真实 route.fetch/fulfill 和 JSON 消费后的下一任务完成信号，不用固定 sleep。既有账号切换、旧响应、CSRF、预约及原型回归纳入完整验证。
+
+本轮证据单独存放于 [initialization-review](../evidence/initialization-review/)，历史 phase2 报告保持原样。最终验证于 2026-11-23 北京时间 21:18 完成，完整验证器 exit 0。实际执行命令（仓库根目录）：
+
+```bash
+NODE_PATH=/Users/zhouyiheng/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
+STUDYSEAT_NODE=/Users/zhouyiheng/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node \
+STUDYSEAT_BROWSER_CHANNEL=chrome \
+STUDYSEAT_EVIDENCE_DIR=alpha/evidence/initialization-review/final \
+/tmp/studyseat-phase2-venv/bin/python alpha/scripts/verify_phase2.py
+```
+
+| 本轮检查 | 实际结果 | 证据 |
+| --- | --- | --- |
+| pytest（完整后端） | 89 passed，0 failed/errors/skipped；本次新增覆盖位于浏览器，不虚增后端数量 | [pytest](../evidence/initialization-review/final/pytest.txt)、[JUnit](../evidence/initialization-review/final/pytest.xml) |
+| Ruff lint、format | 通过；20 files already formatted | [lint](../evidence/initialization-review/final/ruff-check.txt)、[format](../evidence/initialization-review/final/ruff-format.txt) |
+| JS 语法、原型单测 | 通过；原型 70 passed、0 failed/skipped | [syntax](../evidence/initialization-review/final/js-syntax.txt)、[单测](../evidence/initialization-review/final/prototype-tests.txt) |
+| 真实服务双进程重启 | 预约、会话、幂等、重复取消与释放恢复通过 | [重启](../evidence/initialization-review/final/restart/process-smoke.json) |
+| 既有 Alpha 浏览器 | 正常流程 11 检查点、账号切换 6 场景、预约 6 组检查均通过 | [基础](../evidence/initialization-review/final/browser/browser.json)、[账号与 CSRF](../evidence/initialization-review/final/account-switch/results.json)、[预约](../evidence/initialization-review/final/reservations-browser/results.json) |
+| 新增初始化浏览器 | 6 场景通过：A、两种 B 顺序、旧读取错误、C、失败重试；0 page errors | [新增回归](../evidence/initialization-review/final/initialization-browser/results.json) |
+| 临时导出原型浏览器 | 六个原型流程通过，0 page errors | [原型](../evidence/initialization-review/final/prototype-browser/results.json) |
+
+[完整报告与 25 个执行文件 SHA-256](../evidence/initialization-review/final/verification.json) 已核对最终源码。截图已检查，查询表单初始化完成后正常布局。此前增加双查询交付检查时，测试自身动态注册/清理路由产生 Route is already handled，未计为通过；改用每页固定路由队列后重新完整执行通过。[失败尝试日志](../evidence/initialization-review/attempts/route-conflict.txt) 与 [失败状态](../evidence/initialization-review/attempts/route-conflict.json) 另行保留。
+
+本轮实际环境为 macOS 27.0.1 arm64、Python 3.13.15、SQLite 3.50.4、Flask 3.1.3、pytest 8.3.5、Ruff 0.17.6、Node 24.22.3、Playwright 1.62.1、Chrome 156.0.8078.48。Windows/Edge 本轮未执行；团队复核修复及正式验收仍待完成。范围限制仍为本地课程验收：未增加签到、超时或管理写操作，未推送、合并或发布。

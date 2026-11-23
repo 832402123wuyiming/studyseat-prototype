@@ -46,3 +46,6 @@ footer { border-top: 1px solid #e1e9f6; color: #8999b0; font-size: 12px; }
 #reservations li { margin-bottom: 16px; }
 #reservations button { display: block; margin-top: 8px; }
 #availability { font-size: 13px; color: #6e8099; }
+
+#search-fields { display: grid; gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
+#initialization-state { font-size: 13px; color: #6e8099; }

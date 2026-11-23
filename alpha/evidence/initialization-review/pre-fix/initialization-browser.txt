@@ -1,0 +1,14 @@
+AssertionError [ERR_ASSERTION]: room initialization must survive query input
+
+0 !== 4
+
+    at /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/initialization-browser.cjs:109:14
+    at async scenario (/Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/initialization-browser.cjs:80:7)
+    at async /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/initialization-browser.cjs:92:5 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 4,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

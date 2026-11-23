@@ -153,7 +153,12 @@ def main():
     run([sys.executable, str(ALPHA / "scripts/process_smoke.py")], "process-smoke.txt", ALPHA, env)
     with tempfile.TemporaryDirectory(prefix="studyseat-phase2-") as temporary:
         directory = Path(temporary)
-        for script in ("browser.cjs", "account-switch.cjs", "reservations-browser.cjs"):
+        for script in (
+            "browser.cjs",
+            "account-switch.cjs",
+            "reservations-browser.cjs",
+            "initialization-browser.cjs",
+        ):
             browser_case(directory, script)
         prototype_browser(directory)
     report = {
@@ -161,7 +166,7 @@ def main():
         "executed_at": datetime.now(timezone.utc).isoformat(),
         "python": sys.version,
         "browser_channel": os.environ.get("STUDYSEAT_BROWSER_CHANNEL", "msedge"),
-        "scope": "pytest, Ruff, JS syntax, prototype tests, real restart, foundation/account-switch/reservation browsers, prototype browser",
+        "scope": "pytest, Ruff, JS syntax, prototype tests, real restart, foundation/account-switch/reservation/initialization browsers, prototype browser",
         "database_isolation": "pytest tmp_path; restart TemporaryDirectory; one fresh file per browser suite",
     }
     report["runtime"] = {

@@ -1,6 +1,8 @@
 /* API transport, rendering, and event handlers keep server decisions authoritative. */
 let csrfToken = '';
-let generation = 0;
+// Identity transitions invalidate every private response; query edits invalidate seats only.
+let identityGeneration = 0;
+let seatQueryGeneration = 0;
 let identityKey = '';
 let pendingBooking = null;
 const busyButtons = new WeakMap();
@@ -12,7 +14,10 @@ function clearLoadedData() {
   element('admin').hidden = true;
   element('student-booking').hidden = true;
   element('booking-form').hidden = true;
-  element('availability').textContent = '请先查询。';
+  invalidateSeats();
+  element('search-fields').disabled = true;
+  element('initialization-state').textContent = '正在加载工作台…';
+  element('reload-dashboard').hidden = true;
 }
 
 function clearPrivateState() {
@@ -25,7 +30,7 @@ function clearPrivateState() {
   element('end-at').value = '';
 }
 
-async function api(path, options = {}, epoch = generation) {
+async function api(path, options = {}, epoch = identityGeneration, isCurrent = () => true) {
   const response = await fetch(`/api/v1${path}`, {
     credentials: 'same-origin',
     ...options,
@@ -33,7 +38,7 @@ async function api(path, options = {}, epoch = generation) {
   });
   const body = await response.json();
   // Check before CSRF, errors, or callers can publish an obsolete response.
-  if (epoch !== generation) throw new StaleResponse();
+  if (epoch !== identityGeneration || !isCurrent()) throw new StaleResponse();
   if (!response.ok) throw new Error(body.error?.message || '请求失败，请重试。');
   if (body.data?.csrf_token) csrfToken = body.data.csrf_token;
   return body.data;
@@ -54,53 +59,63 @@ async function refreshNotes(epoch) {
 }
 
 async function refresh(epoch) {
-  clearLoadedData();
-  const data = await api('/auth/session', {}, epoch);
-  const nextKey = data.user ? `${data.user.id}:${data.user.role}` : '';
-  if (identityKey !== nextKey || !data.user) clearPrivateState();
-  identityKey = nextKey;
-  element('loading').hidden = true;
-  element('login-view').hidden = Boolean(data.user);
-  element('dashboard').hidden = !data.user;
-  if (!data.user) return;
-  element('welcome').textContent = `你好，${data.user.display_name}`;
-  element('identity').textContent = `${data.user.username} · ${data.user.role === 'admin' ? '管理员' : '学生'} · 已连接服务端`;
-  element('admin').hidden = data.user.role !== 'admin';
-  element('student-booking').hidden = data.user.role !== 'student';
-  element('reservations').textContent = '预约尚未加载。';
-  element('notes').textContent = '记录尚未加载。';
-  const [rooms, rules] = await Promise.all([api('/rooms', {}, epoch), api('/rules', {}, epoch), refreshNotes(epoch), data.user.role === 'student' ? refreshReservations(epoch) : Promise.resolve()]);
-  if (epoch !== generation) throw new StaleResponse();
-  element('rules').textContent = `规则 v${rules.version}：单次最长 ${rules.settings.max_duration_minutes / 60} 小时，最多提前 ${rules.settings.max_advance_days} 天。当前为项目演示参数。`;
-  element('rooms').replaceChildren(...rooms.map(room => {
-    const card = document.createElement('div');
-    card.className = 'room';
-    card.textContent = room.name;
-    const detail = document.createElement('span');
-    detail.textContent = `${room.location} · ${room.seat_count} 个座位（资源目录）`;
-    card.append(detail);
-    return card;
-  }));
-  element('room-id').replaceChildren(...rooms.map(room => {
-    const option = document.createElement('option');
-    option.value = room.id;
-    option.textContent = `${room.name}${room.enabled ? '' : '（停用）'}`;
-    option.disabled = !room.enabled;
-    return option;
-  }));
-  if (!element('start-at').value) {
-    const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
-    element('start-at').value = `${tomorrow}T09:00`;
-    element('end-at').value = `${tomorrow}T10:00`;
-  }
-  element('admin').hidden = data.user.role !== 'admin';
-  if (data.user.role === 'admin') {
-    renderList('events', await api('/admin/audit-events', {}, epoch), event => `${event.action} · ${event.actor_id} · ${new Date(event.occurred_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`);
+  try {
+    clearLoadedData();
+    const data = await api('/auth/session', {}, epoch);
+    const nextKey = data.user ? `${data.user.id}:${data.user.role}` : '';
+    if (identityKey !== nextKey || !data.user) clearPrivateState();
+    identityKey = nextKey;
+    element('loading').hidden = true;
+    element('login-view').hidden = Boolean(data.user);
+    element('dashboard').hidden = !data.user;
+    if (!data.user) return;
+    element('welcome').textContent = `你好，${data.user.display_name}`;
+    element('identity').textContent = `${data.user.username} · ${data.user.role === 'admin' ? '管理员' : '学生'} · 已连接服务端`;
+    element('admin').hidden = data.user.role !== 'admin';
+    element('student-booking').hidden = data.user.role !== 'student';
+    element('reservations').textContent = '预约尚未加载。';
+    element('notes').textContent = '记录尚未加载。';
+    const [rooms, rules] = await Promise.all([api('/rooms', {}, epoch), api('/rules', {}, epoch), refreshNotes(epoch), data.user.role === 'student' ? refreshReservations(epoch) : Promise.resolve()]);
+    if (epoch !== identityGeneration) throw new StaleResponse();
+    element('rules').textContent = `规则 v${rules.version}：单次最长 ${rules.settings.max_duration_minutes / 60} 小时，最多提前 ${rules.settings.max_advance_days} 天。当前为项目演示参数。`;
+    element('rooms').replaceChildren(...rooms.map(room => {
+      const card = document.createElement('div');
+      card.className = 'room';
+      card.textContent = room.name;
+      const detail = document.createElement('span');
+      detail.textContent = `${room.location} · ${room.seat_count} 个座位（资源目录）`;
+      card.append(detail);
+      return card;
+    }));
+    element('room-id').replaceChildren(...rooms.map(room => {
+      const option = document.createElement('option');
+      option.value = room.id;
+      option.textContent = `${room.name}${room.enabled ? '' : '（停用）'}`;
+      option.disabled = !room.enabled;
+      return option;
+    }));
+    if (!element('start-at').value) {
+      const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
+      element('start-at').value = `${tomorrow}T09:00`;
+      element('end-at').value = `${tomorrow}T10:00`;
+    }
+    element('admin').hidden = data.user.role !== 'admin';
+    if (data.user.role === 'admin') {
+      renderList('events', await api('/admin/audit-events', {}, epoch), event => `${event.action} · ${event.actor_id} · ${new Date(event.occurred_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`);
+    }
+    element('search-fields').disabled = data.user.role !== 'student';
+    element('initialization-state').textContent = '';
+  } catch (error) {
+    if (epoch === identityGeneration && !(error instanceof StaleResponse)) {
+      element('initialization-state').textContent = '工作台加载失败，请重新加载工作台。';
+      element('reload-dashboard').hidden = false;
+    }
+    throw error;
   }
 }
 
 async function act(button, task, authChange = false) {
-  const epoch = ++generation;
+  const epoch = authChange ? ++identityGeneration : identityGeneration;
   if (authChange) {
     clearPrivateState();
     element('dashboard').hidden = true;
@@ -111,16 +126,17 @@ async function act(button, task, authChange = false) {
       busyButtons.delete(control);
     }
   }
-  busyButtons.set(button, epoch);
+  const operation = Symbol();
+  busyButtons.set(button, operation);
   button.disabled = true;
   element('status').textContent = '';
   try { await task(epoch); } catch (error) {
-    if (epoch === generation && !(error instanceof StaleResponse)) {
+    if (epoch === identityGeneration && !(error instanceof StaleResponse)) {
       element('status').textContent = error.message;
       if (authChange && element('dashboard').hidden) element('login-view').hidden = false;
     }
   } finally {
-    if (busyButtons.get(button) === epoch) {
+    if (busyButtons.get(button) === operation) {
       busyButtons.delete(button);
       button.disabled = false;
     }
@@ -148,7 +164,7 @@ element('note-form').addEventListener('submit', event => {
     await api('/persistence-notes', { method: 'POST', body: JSON.stringify({ content }) }, epoch);
     element('note').value = '';
     await refresh(epoch);
-    if (epoch !== generation) throw new StaleResponse();
+    if (epoch !== identityGeneration) throw new StaleResponse();
     element('status').textContent = '已保存，可刷新页面验证。';
   });
 });
@@ -179,7 +195,13 @@ async function refreshReservations(epoch) {
   if (!records.length) element('reservations').textContent = '还没有预约，请选择房间和时间查询。';
 }
 
-function invalidateSeats() {
+function invalidateSeats(releaseButton = true) {
+  ++seatQueryGeneration;
+  if (releaseButton) {
+    const button = element('search-form').querySelector('button');
+    busyButtons.delete(button);
+    button.disabled = false;
+  }
   element('seat-id').replaceChildren();
   element('booking-form').hidden = true;
   element('availability').textContent = '请重新查询。';
@@ -192,17 +214,17 @@ function searchParameters() {
 }
 
 for (const id of ['room-id', 'start-at', 'end-at']) element(id).addEventListener('input', () => {
-  ++generation;
   invalidateSeats();
 });
 element('search-form').addEventListener('submit', event => {
   event.preventDefault();
   const parameters = searchParameters();
   act(event.submitter, async epoch => {
-    invalidateSeats();
+    invalidateSeats(false);
+    const queryEpoch = seatQueryGeneration;
     element('availability').textContent = '正在查询…';
     try {
-      const result = await api(`/seats?${new URLSearchParams(parameters)}`, {}, epoch);
+      const result = await api(`/seats?${new URLSearchParams(parameters)}`, {}, epoch, () => queryEpoch === seatQueryGeneration);
       element('seat-id').replaceChildren(...result.seats.map(seat => {
         const option = document.createElement('option');
         option.value = seat.id;
@@ -212,7 +234,8 @@ element('search-form').addEventListener('submit', event => {
       element('availability').textContent = result.seats.length ? `此时段可预约 ${result.seats.length} 个座位。` : '没有可预约座位，或本人已有重叠预约。请调整时间或房间。';
       element('booking-form').hidden = result.seats.length === 0;
     } catch (error) {
-      if (epoch === generation) element('availability').textContent = '查询失败，请重试。';
+      if (epoch !== identityGeneration || queryEpoch !== seatQueryGeneration) throw new StaleResponse();
+      element('availability').textContent = '查询失败，请重试。';
       throw error;
     }
   });
@@ -230,7 +253,7 @@ element('booking-form').addEventListener('submit', event => {
     invalidateSeats();
     element('status').textContent = '预约已保存。';
     try { await refreshReservations(epoch); } catch (error) {
-      if (epoch === generation) element('status').textContent = `预约已保存，列表刷新失败：${error.message} 请点击刷新预约。`;
+      if (epoch === identityGeneration) element('status').textContent = `预约已保存，列表刷新失败：${error.message} 请点击刷新预约。`;
       return;
     }
     element('status').textContent = '预约已保存，可刷新页面或重新登录查看。';
@@ -239,13 +262,14 @@ element('booking-form').addEventListener('submit', event => {
 element('reload-reservations').addEventListener('click', event => act(event.currentTarget, async epoch => {
   element('reservations').textContent = '正在加载预约…';
   try { await refreshReservations(epoch); } catch (error) {
-    if (epoch === generation) element('reservations').textContent = '预约加载失败，请重试。';
+    if (epoch === identityGeneration) element('reservations').textContent = '预约加载失败，请重试。';
     throw error;
   }
 }));
-const bootstrap = ++generation;
+element('reload-dashboard').addEventListener('click', event => act(event.currentTarget, epoch => refresh(epoch)));
+const bootstrap = ++identityGeneration;
 refresh(bootstrap).catch(error => {
-  if (bootstrap !== generation || error instanceof StaleResponse) return;
+  if (bootstrap !== identityGeneration || error instanceof StaleResponse) return;
   element('loading').hidden = true;
   element('status').textContent = `${error.message} 请确认服务已初始化，然后刷新页面。`;
 });

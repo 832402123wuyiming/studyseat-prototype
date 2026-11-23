@@ -15,10 +15,21 @@ test('GitHub export is self-contained, matches source hashes, excludes unrelated
   execFileSync(python,[path.join(root,'scripts/prepare-github.py'),'--output',output]);
   const manifest=JSON.parse(fs.readFileSync(path.join(output,'SUBMISSION_MANIFEST.json'),'utf8'));
   for(const file of manifest.files){assert.equal(createHash('sha256').update(fs.readFileSync(path.join(output,file.path))).digest('hex'),file.sha256,file.path);assert(fs.readFileSync(path.join(root,file.path)).equals(fs.readFileSync(path.join(output,file.path))));}
-  for(const name of ['.git','studyseat-raw','studyseat-blue','studyseat-admin','studyseat-supply','ph.json','srs-content.md','srs-images','ppt-inspect','blog-dump.txt','blog-structure.json','fix-data.js','tests/legacy','docs/验收与演示说明.md','docs/screenshots/before-login.png'])assert(!fs.existsSync(path.join(output,name)),name);
+  for(const name of ['alpha/README.md','alpha/studyseat/api.py','alpha/studyseat/schema.sql','alpha/docs/API-v1.md','alpha/tests/test_foundation.py'])assert(fs.existsSync(path.join(output,name)),name);
+  for(const name of ['alpha/instance','alpha/.venv','alpha/.env','alpha/private.txt','.git','studyseat-raw','studyseat-blue','studyseat-admin','studyseat-supply','ph.json','srs-content.md','srs-images','ppt-inspect','blog-dump.txt','blog-structure.json','fix-data.js','tests/legacy','docs/验收与演示说明.md','docs/screenshots/before-login.png'])assert(!fs.existsSync(path.join(output,name)),name);
   const before=fs.readFileSync(path.join(output,'README.md'));assert.throws(()=>execFileSync(python,[path.join(root,'scripts/prepare-github.py'),'--output',output],{stdio:'pipe'}));assert(fs.readFileSync(path.join(output,'README.md')).equals(before));
   // The exported source can regenerate the deployable site without any ancestor workspace.
   const prior=fs.readFileSync(path.join(output,'docs/prototype-release.json'));execFileSync(python,[path.join(output,'scripts/build-prototype.py')]);assert(fs.readFileSync(path.join(output,'docs/prototype-release.json')).equals(prior));
-  for(const file of [path.join(output,'README.md'),...fs.readdirSync(path.join(output,'docs')).filter(n=>n.endsWith('.md')).map(n=>path.join(output,'docs',n))])for(const [,url]of fs.readFileSync(file,'utf8').matchAll(/\]\(([^\s)]+)\)/g)){if(/^(https?:|#)/.test(url))continue;assert(fs.existsSync(path.resolve(path.dirname(file),decodeURIComponent(url.split('#')[0]))),file+': '+url);}
+  for(const file of [path.join(output,'alpha/README.md'),...fs.readdirSync(path.join(output,'alpha/docs')).filter(n=>n.endsWith('.md')).map(n=>path.join(output,'alpha/docs',n)),path.join(output,'README.md'),...fs.readdirSync(path.join(output,'docs')).filter(n=>n.endsWith('.md')).map(n=>path.join(output,'docs',n))])for(const [,url]of fs.readFileSync(file,'utf8').matchAll(/\]\(([^\s)]+)\)/g)){if(/^(https?:|#)/.test(url))continue;assert(fs.existsSync(path.resolve(path.dirname(file),decodeURIComponent(url.split('#')[0]))),file+': '+url);}
  }finally{fs.rmSync(temporary,{recursive:true,force:true});}
+});
+
+test('Alpha export allowlist excludes runtime and unrelated data',()=>{
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'studyseat-allowlist-'));
+ const python=process.env.STUDYSEAT_PYTHON||'python3';
+ try {
+  for(const name of ['alpha/instance/private.py','alpha/.venv/leak.py','alpha/studyseat/__pycache__/leak.py','alpha/private.txt','alpha/.env']){const file=path.join(temporary,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'secret');}
+  const selected=JSON.parse(execFileSync(python,['-c',"import importlib.util,json,pathlib,sys; s=importlib.util.spec_from_file_location('exporter',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(json.dumps(m.selected_files(pathlib.Path(sys.argv[2]))))",path.join(root,'scripts/prepare-github.py'),temporary],{encoding:'utf8'}));
+  for(const file of selected)assert(!file.includes('leak')&&!file.includes('private')&&!file.endsWith('/.env'),file);
+ } finally {fs.rmSync(temporary,{recursive:true,force:true});}
 });

@@ -3,6 +3,7 @@ let csrfToken = '';
 // Identity transitions invalidate every private response; query edits invalidate seats only.
 let identityGeneration = 0;
 let seatQueryGeneration = 0;
+let reservationListGeneration = 0;
 let identityKey = '';
 let pendingBooking = null;
 const busyButtons = new WeakMap();
@@ -10,6 +11,7 @@ const element = id => document.getElementById(id);
 class StaleResponse extends Error {}
 
 function clearLoadedData() {
+  ++reservationListGeneration;
   for (const id of ['rooms', 'rules', 'notes', 'events', 'reservations', 'seat-id', 'room-id']) element(id).replaceChildren();
   element('admin').hidden = true;
   element('student-booking').hidden = true;
@@ -75,7 +77,10 @@ async function refresh(epoch) {
     element('student-booking').hidden = data.user.role !== 'student';
     element('reservations').textContent = '预约尚未加载。';
     element('notes').textContent = '记录尚未加载。';
-    const [rooms, rules] = await Promise.all([api('/rooms', {}, epoch), api('/rules', {}, epoch), refreshNotes(epoch), data.user.role === 'student' ? refreshReservations(epoch) : Promise.resolve()]);
+    const [rooms, rules] = await Promise.all([api('/rooms', {}, epoch), api('/rules', {}, epoch), refreshNotes(epoch), data.user.role === 'student' ? refreshReservations(epoch).catch(error => {
+      // A newer list read must not cancel this identity's room/rule initialization.
+      if (!(error instanceof StaleResponse)) throw error;
+    }) : Promise.resolve()]);
     if (epoch !== identityGeneration) throw new StaleResponse();
     element('rules').textContent = `规则 v${rules.version}：单次最长 ${rules.settings.max_duration_minutes / 60} 小时，最多提前 ${rules.settings.max_advance_days} 天。当前为项目演示参数。`;
     element('rooms').replaceChildren(...rooms.map(room => {
@@ -114,7 +119,7 @@ async function refresh(epoch) {
   }
 }
 
-async function act(button, task, authChange = false) {
+async function act(button, task, authChange = false, isCurrent = () => true) {
   const epoch = authChange ? ++identityGeneration : identityGeneration;
   if (authChange) {
     clearPrivateState();
@@ -131,7 +136,7 @@ async function act(button, task, authChange = false) {
   button.disabled = true;
   element('status').textContent = '';
   try { await task(epoch); } catch (error) {
-    if (epoch === identityGeneration && !(error instanceof StaleResponse)) {
+    if (epoch === identityGeneration && isCurrent() && !(error instanceof StaleResponse)) {
       element('status').textContent = error.message;
       if (authChange && element('dashboard').hidden) element('login-view').hidden = false;
     }
@@ -171,28 +176,55 @@ element('note-form').addEventListener('submit', event => {
 const statusLabels = { PENDING_CHECKIN: '待签到', CANCELLED: '已取消', IN_USE: '使用中', ON_LEAVE: '暂离中', COMPLETED: '已结束', EXPIRED: '已超时' };
 const beijingTime = value => new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
 
-async function refreshReservations(epoch) {
-  const records = await api('/reservations', {}, epoch);
-  element('reservations').replaceChildren(...records.map(record => {
-    const item = document.createElement('li');
-    item.dataset.reservationId = record.id;
-    item.textContent = `${record.room_name} · ${record.seat_label} · ${beijingTime(record.start_at)} — ${beijingTime(record.end_at)}（北京时间）· ${statusLabels[record.status]} · 规则 v${record.rule_version_id}`;
-    // Cancellation follows the existing pending-only state rule on the server.
-    if (record.status === 'PENDING_CHECKIN') {
-      const button = document.createElement('button');
-      button.className = 'secondary';
-      button.textContent = '取消预约';
-      button.addEventListener('click', () => act(button, async current => {
-        await api(`/reservations/${encodeURIComponent(record.id)}/cancel`, { method: 'POST' }, current);
-        invalidateSeats();
-        await refreshReservations(current);
-        element('status').textContent = '已取消，对应时段已释放。';
-      }));
-      item.append(button);
+function reservationListCurrent(epoch, version) {
+  return epoch === identityGeneration && version === reservationListGeneration;
+}
+
+async function refreshReservations(epoch, version = ++reservationListGeneration) {
+  const isCurrent = () => reservationListCurrent(epoch, version);
+  const button = element('reload-reservations');
+  const operation = Symbol();
+  // All list loads own this button, including loads after create/cancel.
+  busyButtons.set(button, operation);
+  button.disabled = true;
+  try {
+    const records = await api('/reservations', {}, epoch, isCurrent);
+    if (!isCurrent()) throw new StaleResponse();
+    element('reservations').replaceChildren(...records.map(record => {
+      const item = document.createElement('li');
+      item.dataset.reservationId = record.id;
+      item.textContent = `${record.room_name} · ${record.seat_label} · ${beijingTime(record.start_at)} — ${beijingTime(record.end_at)}（北京时间）· ${statusLabels[record.status]} · 规则 v${record.rule_version_id}`;
+      // Cancellation follows the existing pending-only state rule on the server.
+      if (record.status === 'PENDING_CHECKIN') {
+        const button = document.createElement('button');
+        button.className = 'secondary';
+        button.textContent = '取消预约';
+        button.addEventListener('click', () => {
+          let listVersion;
+          act(button, async current => {
+            await api(`/reservations/${encodeURIComponent(record.id)}/cancel`, { method: 'POST' }, current);
+            listVersion = ++reservationListGeneration;
+            invalidateSeats();
+            const isCurrent = await refreshReservations(current, listVersion);
+            if (isCurrent()) element('status').textContent = '已取消，对应时段已释放。';
+          }, false, () => listVersion === undefined || listVersion === reservationListGeneration);
+        });
+        item.append(button);
+      }
+      return item;
+    }));
+    if (!records.length) element('reservations').textContent = '还没有预约，请选择房间和时间查询。';
+    return isCurrent;
+  } catch (error) {
+    // Network/JSON failures can occur before api checks its response guard.
+    if (!isCurrent()) throw new StaleResponse();
+    throw error;
+  } finally {
+    if (busyButtons.get(button) === operation) {
+      busyButtons.delete(button);
+      button.disabled = false;
     }
-    return item;
-  }));
-  if (!records.length) element('reservations').textContent = '还没有预约，请选择房间和时间查询。';
+  }
 }
 
 function invalidateSeats(releaseButton = true) {
@@ -247,25 +279,39 @@ element('booking-form').addEventListener('submit', event => {
   const fingerprint = JSON.stringify(draft);
   if (pendingBooking?.fingerprint !== fingerprint) pendingBooking = { fingerprint, ...draft, idempotency_key: crypto.randomUUID() };
   const { fingerprint: ignored, ...body } = pendingBooking;
+  let listVersion;
   act(event.submitter, async epoch => {
     await api('/reservations', { method: 'POST', body: JSON.stringify(body) }, epoch);
+    // Committed mutations invalidate every pre-operation list read before reloading.
+    listVersion = ++reservationListGeneration;
     pendingBooking = null;
     invalidateSeats();
     element('status').textContent = '预约已保存。';
-    try { await refreshReservations(epoch); } catch (error) {
-      if (epoch === identityGeneration) element('status').textContent = `预约已保存，列表刷新失败：${error.message} 请点击刷新预约。`;
+    try {
+      const isCurrent = await refreshReservations(epoch, listVersion);
+      if (!isCurrent()) return;
+    } catch (error) {
+      if (reservationListCurrent(epoch, listVersion)) element('status').textContent = `预约已保存，列表刷新失败：${error.message} 请点击刷新预约。`;
       return;
     }
     element('status').textContent = '预约已保存，可刷新页面或重新登录查看。';
-  });
+  }, false, () => listVersion === undefined || listVersion === reservationListGeneration);
 });
-element('reload-reservations').addEventListener('click', event => act(event.currentTarget, async epoch => {
-  element('reservations').textContent = '正在加载预约…';
-  try { await refreshReservations(epoch); } catch (error) {
-    if (epoch === identityGeneration) element('reservations').textContent = '预约加载失败，请重试。';
-    throw error;
-  }
-}));
+element('reload-reservations').addEventListener('click', event => {
+  const version = ++reservationListGeneration;
+  act(event.currentTarget, async epoch => {
+    // Keep confirmed records/actions visible while the replacement is loading.
+    element('status').textContent = '正在加载预约…';
+    try {
+      const isCurrent = await refreshReservations(epoch, version);
+      if (isCurrent()) element('status').textContent = '';
+    } catch (error) {
+      if (!reservationListCurrent(epoch, version)) throw new StaleResponse();
+      element('reservations').textContent = '预约加载失败，请重试。';
+      throw error;
+    }
+  }, false, () => version === reservationListGeneration);
+});
 element('reload-dashboard').addEventListener('click', event => act(event.currentTarget, epoch => refresh(epoch)));
 const bootstrap = ++identityGeneration;
 refresh(bootstrap).catch(error => {

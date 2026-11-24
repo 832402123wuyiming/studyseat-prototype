@@ -1,0 +1,36 @@
+{
+  "result": "failed",
+  "scenario": "A-empty-list-after-create",
+  "completed": [],
+  "ui": {
+    "list": "还没有预约，请选择房间和时间查询。",
+    "status": "预约已保存，可刷新页面或重新登录查看。"
+  },
+  "server_records": [
+    {
+      "checked_in_at": null,
+      "created_at": "2026-11-24T00:49:55.798281Z",
+      "end_at": "2026-11-25T02:00:00.000000Z",
+      "ended_at": null,
+      "id": "3ea8d85d-b010-464e-a0b6-88c5a4798d3f",
+      "leave_deadline": null,
+      "leave_started_at": null,
+      "room_id": "lib-a101",
+      "room_name": "图书馆 3F 自习室 A101",
+      "rule_snapshot": {
+        "check_in_early_minutes": 10,
+        "check_in_late_minutes": 15,
+        "leave_limit_minutes": 30,
+        "max_advance_days": 7,
+        "max_duration_minutes": 240
+      },
+      "rule_version_id": 1,
+      "seat_id": "lib-a101:A01",
+      "seat_label": "A01",
+      "start_at": "2026-11-25T01:00:00.000000Z",
+      "status": "PENDING_CHECKIN",
+      "student_id": "student01"
+    }
+  ],
+  "error": "AssertionError [ERR_ASSERTION]: old empty list must not hide the saved reservation\n\n0 !== 1\n\n    at /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/reservation-list-browser.cjs:146:14\n    at async scenario (/Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/reservation-list-browser.cjs:125:21)\n    at async /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/reservation-list-browser.cjs:138:5"
+}

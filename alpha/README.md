@@ -104,3 +104,5 @@ python scripts/verify_phase2.py
 任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2 已合并；本轮阶段二只做本地提交，未推送、合并或部署。非作者审查与正式验收待团队完成。
 
 P2 独立审查修复了初始化期间编辑查询条件导致房间列表永久为空的问题。工作台加载期间查询控件禁用，失败时可点击“重新加载工作台”；条件编辑仅使旧余量查询失效。新增 `alpha/tests/initialization-browser.cjs` 已接入完整验证。复核时通过 `STUDYSEAT_EVIDENCE_DIR` 指定新证据目录，保留历史结果。缺陷与本轮证据见 [阶段二复核记录](docs/PHASE2.md#p2-独立审查前端初始化修复)。
+
+预约列表独立复查增加了同一身份下的列表请求版本保护。创建、取消成功后旧读取失效；手动刷新保留现有记录并显示加载提示，旧错误或按钮清理不干扰最新操作。新增 `alpha/tests/reservation-list-browser.cjs` 已纳入完整验证；本轮复现、修复和结果见 [列表乱序复查记录](docs/PHASE2.md#p2-预约列表乱序修复)。

@@ -28,7 +28,7 @@
 
 ## 自动化验证
 
-在 alpha 下安装 requirements-dev.txt；Node 安装根 package.json 的 Playwright 依赖。选择实际安装的浏览器：Windows 默认 msedge，macOS 可设 STUDYSEAT_BROWSER_CHANNEL=chrome。运行 `python scripts/verify_phase2.py`。支持 STUDYSEAT_NODE、NODE_PATH 和 STUDYSEAT_EVIDENCE_DIR。此脚本执行 pytest、Ruff、JS 语法、原型单测、真实进程重启、四组 Alpha 浏览器（含初始化回归）和临时导出副本中的原型浏览器。所有服务仅绑定 127.0.0.1；结束清理临时服务及数据库，不启动长期服务。
+在 alpha 下安装 requirements-dev.txt；Node 安装根 package.json 的 Playwright 依赖。选择实际安装的浏览器：Windows 默认 msedge，macOS 可设 STUDYSEAT_BROWSER_CHANNEL=chrome。运行 `python scripts/verify_phase2.py`。支持 STUDYSEAT_NODE、NODE_PATH 和 STUDYSEAT_EVIDENCE_DIR。此脚本执行 pytest、Ruff、JS 语法、原型单测、真实进程重启、五组 Alpha 浏览器（含初始化与列表乱序回归）和临时导出副本中的原型浏览器。所有服务仅绑定 127.0.0.1；结束清理临时服务及数据库，不启动长期服务。
 
 独立运行：`python -m pytest -q --junitxml=evidence/phase2/pytest.xml`、`python -m ruff check .`、`python -m ruff format --check .`、`STUDYSEAT_EVIDENCE_DIR=evidence/phase2/restart python scripts/process_smoke.py`。根目录可运行 `node --test tests/*.test.cjs`。浏览器可针对独立测试库服务分别执行 alpha/tests/browser.cjs、account-switch.cjs、reservations-browser.cjs；不要指向日常数据库。
 
@@ -102,3 +102,37 @@ STUDYSEAT_EVIDENCE_DIR=alpha/evidence/initialization-review/final \
 [完整报告与 25 个执行文件 SHA-256](../evidence/initialization-review/final/verification.json) 已核对最终源码。截图已检查，查询表单初始化完成后正常布局。此前增加双查询交付检查时，测试自身动态注册/清理路由产生 Route is already handled，未计为通过；改用每页固定路由队列后重新完整执行通过。[失败尝试日志](../evidence/initialization-review/attempts/route-conflict.txt) 与 [失败状态](../evidence/initialization-review/attempts/route-conflict.json) 另行保留。
 
 本轮实际环境为 macOS 27.0.1 arm64、Python 3.13.15、SQLite 3.50.4、Flask 3.1.3、pytest 8.3.5、Ruff 0.17.6、Node 24.22.3、Playwright 1.62.1、Chrome 156.0.8078.48。Windows/Edge 本轮未执行；团队复核修复及正式验收仍待完成。范围限制仍为本地课程验收：未增加签到、超时或管理写操作，未推送、合并或发布。
+
+## P2 预约列表乱序修复
+
+2026-11-24，基于独立复查基线 80690699eabf2b75fe087fd6a72e309236dc5dea。开始时分支 codex/phase2-reservations、HEAD 与基线一致，工作区干净，无后续修复。首先新增真实浏览器回归，在未修改的 app.js 上复现：暂停创建前的真实空列表，创建后已显示新预约，释放旧列表后页面变为“还没有预约”，状态仍为“预约已保存”，服务端仍有一条 PENDING_CHECKIN。断言期望 1 项实得 0；[修复前失败及服务端记录](../evidence/reservation-list-review/pre-fix/reservation-list-browser/failure.json) 和截图保留，不计入通过。
+
+原因为预约列表只有身份代次，没有同一身份内的读取顺序保护。app.js 新增独立 reservationListGeneration；初始化清理、新读取、创建或取消成功均使之前列表读取失效。读取在渲染、错误和反馈之前复核身份与列表版本，网络或 JSON 读取异常也经过相同校验。创建/取消后的完成提示与列表版本绑定；各列表读取独立持有刷新按钮，旧 finally 不能启用新读取占用的按钮。手动刷新保留已确认记录与取消入口，在状态区显示加载反馈。
+
+原有身份与座位查询代次保留，时间/房间 input 不改变列表版本。初始化的 Promise.all 仅忽略明确被更新读取取代的 StaleResponse，仍传播真实错误，且整体继续校验身份；避免旧列表读取失效时再次中断房间和规则初始化。没有修改后端权限、事务、幂等或接口契约。
+
+新增 alpha/tests/reservation-list-browser.cjs 并接入完整验证器。7 个场景对应：A 创建前旧空列表晚到；B/D 取消前后真实列表按新先到、旧先到两种顺序交付；C 旧 503、旧网络拒绝晚于最新结果，且最新读取仍在进行时不能误启用按钮；当前读取失败明确报错且可重试；旧初始化列表被新工作台读取取代，仍可继续查询。仅指定 GET /reservations 被暂缓或模拟交付失败；写入、列表快照、状态和会话均使用真实服务。使用每页固定路由队列、受控 Promise 与 JSON 消费/网络拒绝后下一任务的完成信号，不靠固定 sleep。通过独立 HTTP 读取对照服务端状态，避免只检查 DOM。
+
+本轮证据写入 [reservation-list-review](../evidence/reservation-list-review/)，历史 phase2 与 initialization-review 均保持不变。最终完整验证于北京时间 2026-11-24 08:53 完成，验证器 exit 0。修复前 A 用例失败、修复后定向及完整验证中的新增 7 场景均通过。实际命令（项目根目录）：
+
+```bash
+NODE_PATH=/Users/zhouyiheng/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
+STUDYSEAT_NODE=/Users/zhouyiheng/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node \
+STUDYSEAT_BROWSER_CHANNEL=chrome \
+STUDYSEAT_EVIDENCE_DIR=alpha/evidence/reservation-list-review/final \
+/tmp/studyseat-phase2-venv/bin/python alpha/scripts/verify_phase2.py
+```
+
+| 本轮验证 | 实际结果 | 证据 |
+| --- | --- | --- |
+| pytest 完整后端 | 89 passed、0 failures/errors/skipped；本次新增覆盖为浏览器用例 | [输出](../evidence/reservation-list-review/final/pytest.txt)、[JUnit](../evidence/reservation-list-review/final/pytest.xml) |
+| Ruff lint、格式、JS 语法 | 全部通过；20 files already formatted | [lint](../evidence/reservation-list-review/final/ruff-check.txt)、[format](../evidence/reservation-list-review/final/ruff-format.txt)、[syntax](../evidence/reservation-list-review/final/js-syntax.txt) |
+| 原型单测 | 70 passed、0 failures/skipped | [原型单测](../evidence/reservation-list-review/final/prototype-tests.txt) |
+| 真实双进程重启 | 会话、预约、幂等、取消与释放恢复通过 | [重启](../evidence/reservation-list-review/final/restart/process-smoke.json) |
+| 既有 Alpha 浏览器 | 正常流程 11 检查点、账号切换 6、预约 6、初始化 6 场景均通过 | [基础](../evidence/reservation-list-review/final/browser/browser.json)、[账号与 CSRF](../evidence/reservation-list-review/final/account-switch/results.json)、[预约](../evidence/reservation-list-review/final/reservations-browser/results.json)、[初始化](../evidence/reservation-list-review/final/initialization-browser/results.json) |
+| 新增列表乱序浏览器 | 7 场景通过，含真实服务端状态对照；0 page errors | [列表结果及证明](../evidence/reservation-list-review/final/reservation-list-browser/results.json) |
+| 临时导出原型浏览器 | 六个流程通过，0 page errors | [原型浏览器](../evidence/reservation-list-review/final/prototype-browser/results.json) |
+
+[完整验证及 26 个执行文件 SHA-256](../evidence/reservation-list-review/final/verification.json) 已与最终源码核对。新增场景 A 截图已检查：旧空列表交付后，新预约和“预约已保存”提示一致存在。修复前失败没有计为通过，未覆盖任何历史报告。
+
+实际环境：macOS 27.0.1 arm64、Python 3.13.15、SQLite 3.50.4、Flask 3.1.3、pytest 8.3.5、Ruff 0.17.6、Node 24.22.3、Playwright 1.62.1、Chrome 156.0.8078.48。本次仅本地修复和提交，不推送、不合并、不发布。Windows/Edge 本轮未验证；团队复核及正式验收仍待完成。

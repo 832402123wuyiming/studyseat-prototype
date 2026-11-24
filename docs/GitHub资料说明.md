@@ -1,6 +1,6 @@
 # GitHub 提交资料说明
 
-本仓库内容以当前 Study Seat 原型作业为范围。参考同学仓库以 README、静态站点和文档组织材料的方式，使用当前确认的原型内容；旧仓库在线地址不代表已发布本轮版本。
+本仓库保留当前 Study Seat 原型作业导出用途，同时包含根 README 链接的 Alpha 工程交付。参考同学仓库以 README、静态站点和文档组织材料的方式，使用当前确认的原型内容；旧仓库在线地址不代表已发布本轮版本。
 
 ## 可提交结构
 
@@ -13,6 +13,7 @@ scripts/                生成、版本、预览和资料提取脚本
 tests/                  当前业务、会话、构建及浏览器验收
 modao/                  定版代码组件独立 HTML 备份
 docs/                   当前设计、搭建、演示及验收说明与截图
+alpha/                  真实服务工程、契约、测试和验收证据（不含运行数据）
 SUBMISSION_MANIFEST.json 精简副本的源版本和文件校验清单
 ```
 
@@ -20,7 +21,7 @@ SUBMISSION_MANIFEST.json 精简副本的源版本和文件校验清单
 
 ## 提取规则
 
-`prepare-github.py` 采用明确名单复制当前所需内容，避免把整份开发工作区混入提交。它会排除 `.git`、运行依赖、缓存、历史版本目录、旧测试/截图、上次作业提取稿和旧调试脚本。名单见生成脚本。
+`prepare-github.py` 采用明确名单复制当前所需内容，避免把整份开发工作区混入提交。它会排除 `.git`、运行依赖、缓存、历史版本目录、旧测试/截图、上次作业提取稿和旧调试脚本。名单见生成脚本。Alpha 仅导出明确的根配置文件及 studyseat/docs/tests/scripts/evidence 中的交付文件类型，不复制整个工作区；instance、数据库、密钥、.env、虚拟环境和缓存不导出。
 
 ```sh
 python3 scripts/prepare-github.py --output /你选择的位置/StudySeat_GitHub提交资料

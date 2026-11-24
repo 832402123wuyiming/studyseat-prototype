@@ -1,6 +1,6 @@
 # Study Seat 知行有座 · 智慧校园自习室预约与座位管理原型
 
-## Alpha 首阶段开发入口
+## Alpha 预约阶段开发入口
 
 11 月 21—22 日范围的 Flask + SQLite 实现在 [alpha/README.md](alpha/README.md)。包含真实登录、服务端角色与归属校验、数据库初始化、持久化验证和测试证据。Windows 可在 `alpha/` 执行 `./start.ps1 -Python '你的 Python 3.10+ 路径'` 启动。
 
@@ -182,3 +182,5 @@ STUDYSEAT_BASE_URL=http://127.0.0.1:8765/deploy/ node tests/browser.cjs
 - [GitHub 资料说明](docs/GitHub资料说明.md)
 
 本项目不提供真实身份认证、服务端并发控制、跨设备同步、实际通知推送或后台执行。原型中的统计与预约示例仅用于课程演示。
+
+阶段二已在独立 Flask 工程接通查询、预约和取消，验收、并发复现与本地证据见 [阶段二记录](alpha/docs/PHASE2.md)。静态原型仍为原型演示。

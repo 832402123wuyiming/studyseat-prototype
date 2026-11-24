@@ -1,8 +1,8 @@
-import json
 import uuid
 
 from flask import Blueprint, g, jsonify, render_template, request
 
+from . import reservations
 from .auth import ApiError, activate_session, authenticate, check_csrf, new_session, require_role
 from .db import get_db, utc_now, write_transaction
 
@@ -106,10 +106,8 @@ def rooms():
 @bp.get("/api/v1/rules")
 @require_role()
 def rules():
-    row = get_db().execute("SELECT * FROM rule_versions ORDER BY id DESC LIMIT 1").fetchone()
-    if not row:
-        raise ApiError(503, "NOT_INITIALIZED", "请先初始化演示数据。")
-    return ok({"version": row["id"], "settings": json.loads(row["settings_json"])})
+    version, settings = reservations.rules(get_db())
+    return ok({"version": version, "settings": settings})
 
 
 @bp.get("/api/v1/persistence-notes")
@@ -170,3 +168,52 @@ def get_note(note_id):
 def audit_events():
     rows = get_db().execute("SELECT * FROM audit_events ORDER BY id DESC LIMIT 100").fetchall()
     return ok([dict(row) for row in rows])
+
+
+@bp.get("/api/v1/seats")
+@require_role("student")
+def available_seats():
+    room_id = request.args.get("room_id")
+    if not valid_text(room_id, 100):
+        raise ApiError(400, "INVALID_INPUT", "请选择房间。")
+    return ok(
+        reservations.available(
+            g.identity["id"], room_id, request.args.get("start_at"), request.args.get("end_at")
+        )
+    )
+
+
+@bp.get("/api/v1/reservations")
+@require_role("student")
+def my_reservations():
+    return ok(reservations.list_owned(g.identity["id"]))
+
+
+@bp.get("/api/v1/reservations/<reservation_id>")
+@require_role("student")
+def my_reservation(reservation_id):
+    return ok(reservations.owned(get_db(), g.identity["id"], reservation_id))
+
+
+@bp.post("/api/v1/reservations")
+@require_role("student")
+def create_reservation():
+    check_csrf()
+    body = json_body()
+    if not valid_text(body.get("seat_id"), 100) or not valid_text(body.get("idempotency_key"), 100):
+        raise ApiError(400, "INVALID_INPUT", "座位和幂等键应为 1 至 100 字符。")
+    record, created = reservations.create(
+        g.identity["id"],
+        body["seat_id"],
+        body.get("start_at"),
+        body.get("end_at"),
+        body["idempotency_key"],
+    )
+    return ok(record, 201 if created else 200)
+
+
+@bp.post("/api/v1/reservations/<reservation_id>/cancel")
+@require_role("student")
+def cancel_reservation(reservation_id):
+    check_csrf()
+    return ok(reservations.cancel(g.identity["id"], reservation_id))

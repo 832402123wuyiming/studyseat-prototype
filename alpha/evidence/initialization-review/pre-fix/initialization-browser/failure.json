@@ -1,0 +1,11 @@
+{
+  "result": "failed",
+  "scenario": "A-delayed-rooms-input",
+  "completed": [],
+  "state": {
+    "rooms": 0,
+    "status": "",
+    "reservations": "还没有预约，请选择房间和时间查询。"
+  },
+  "error": "AssertionError [ERR_ASSERTION]: room initialization must survive query input\n\n0 !== 4\n\n    at /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/initialization-browser.cjs:109:14\n    at async scenario (/Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/initialization-browser.cjs:80:7)\n    at async /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/initialization-browser.cjs:92:5"
+}

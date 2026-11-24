@@ -11,8 +11,10 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -98,6 +100,22 @@ def main():
                 {"content": "独立进程重启持久化验证"},
                 logged_in["csrf_token"],
             )
+            tomorrow = datetime.now(ZoneInfo("Asia/Shanghai")).date() + timedelta(days=1)
+            booking = {
+                "seat_id": "lib-a101:A01",
+                "start_at": f"{tomorrow}T09:00:00+08:00",
+                "end_at": f"{tomorrow}T10:00:00+08:00",
+                "idempotency_key": "restart-smoke",
+            }
+            seats_query = "/api/v1/seats?" + urlencode(
+                {
+                    "room_id": "lib-a101",
+                    "start_at": booking["start_at"],
+                    "end_at": booking["end_at"],
+                }
+            )
+            assert len(request(seats_query)["seats"]) == 119
+            reservation = request("/api/v1/reservations", booking, logged_in["csrf_token"])
         finally:
             first.terminate()
             first.wait(timeout=10)
@@ -106,10 +124,59 @@ def main():
             assert first.pid != second.pid
             assert request("/api/v1/me")["id"] == "student01"
             assert request("/api/v1/persistence-notes")[0] == note
+            assert request("/api/v1/reservations") == [reservation]
+            assert request(seats_query)["seats"] == []
             csrf = request("/api/v1/auth/session")["csrf_token"]
-            request("/api/v1/auth/login", {"username": "admin01", "password": "Admin1234"}, csrf)
+            relogged = request(
+                "/api/v1/auth/login", {"username": "832402116", "password": "123456"}, csrf
+            )
+            assert request("/api/v1/reservations") == [reservation]
+            replay = request("/api/v1/reservations", booking, relogged["csrf_token"])
+            assert replay == reservation
+            cancelled = request(
+                f"/api/v1/reservations/{reservation['id']}/cancel", {}, relogged["csrf_token"]
+            )
+            assert (
+                request(
+                    f"/api/v1/reservations/{reservation['id']}/cancel", {}, relogged["csrf_token"]
+                )
+                == cancelled
+            )
+            student_b = request(
+                "/api/v1/auth/login",
+                {"username": "student02", "password": "Study1234"},
+                relogged["csrf_token"],
+            )
+            assert request("/api/v1/reservations") == []
+            assert len(request(seats_query)["seats"]) == 119
+            assert (
+                request("/api/v1/reservations", booking, student_b["csrf_token"])["student_id"]
+                == "student02"
+            )
+            request(
+                "/api/v1/auth/login",
+                {"username": "admin01", "password": "Admin1234"},
+                student_b["csrf_token"],
+            )
             assert any(
                 event["target_id"] == note["id"] for event in request("/api/v1/admin/audit-events")
+            )
+            events = request("/api/v1/admin/audit-events")
+            assert (
+                sum(
+                    e["reservation_id"] == reservation["id"]
+                    and e["action"] == "RESERVATION_CREATED"
+                    for e in events
+                )
+                == 1
+            )
+            assert (
+                sum(
+                    e["reservation_id"] == reservation["id"]
+                    and e["action"] == "RESERVATION_CANCELLED"
+                    for e in events
+                )
+                == 1
             )
         finally:
             second.terminate()
@@ -126,9 +193,15 @@ def main():
                 "process restart",
                 "session restored",
                 "note restored",
+                "reservation and session restored across real process restart",
+                "reservation survives relogin",
+                "create replay returns original reservation",
+                "duplicate cancel preserves original receipt and single audit",
+                "student B can reserve released interval",
                 "admin shares audit data",
             ],
-            "scope": "Persistence notes, not reservations",
+            "scope": "Real persisted reservations and foundation persistence notes",
+            "reservation_id": reservation["id"],
         }
         target = (
             Path(os.environ.get("STUDYSEAT_EVIDENCE_DIR", str(ROOT / "evidence")))

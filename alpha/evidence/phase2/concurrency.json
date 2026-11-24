@@ -1,0 +1,66 @@
+{
+  "result": "passed",
+  "source": "pytest.txt captured successful assertions",
+  "scenarios": [
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        201,
+        409
+      ],
+      "scenario": "same-seat"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        201,
+        409
+      ],
+      "scenario": "same-student"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        200,
+        201
+      ],
+      "scenario": "same-key"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        201,
+        409
+      ],
+      "scenario": "different-payload-key"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 1,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        200,
+        200
+      ],
+      "scenario": "same-cancel"
+    }
+  ]
+}

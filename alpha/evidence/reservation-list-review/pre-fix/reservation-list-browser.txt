@@ -1,0 +1,15 @@
+SCENARIO A-empty-list-after-create
+AssertionError [ERR_ASSERTION]: old empty list must not hide the saved reservation
+
+0 !== 1
+
+    at /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/reservation-list-browser.cjs:146:14
+    at async scenario (/Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/reservation-list-browser.cjs:125:21)
+    at async /Users/zhouyiheng/Desktop/软件工程/studyseat-phase2/alpha/tests/reservation-list-browser.cjs:138:5 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

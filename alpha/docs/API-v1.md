@@ -22,6 +22,30 @@
 
 FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本阶段验证文本不对应预约需求，只用于工程验收。
 
+## 阶段二预约接口 已实现
+
+关联学生查询、预约主流程、FR-09 取消，以及权限、持久化与并发验收。以下接口均要求 student 会话；所有 POST 还要求 CSRF。管理员访问返回 403。JSON 的 student_id、role 等额外身份字段不影响服务端身份。
+
+| 方法与路径 | 请求与约束 | 成功输出 |
+| --- | --- | --- |
+| GET /seats?room_id=&start_at=&end_at= | 房间 ID、带时区时间 | 200，{seats:[{id,room_id,label}],start_at,end_at,server_time}；无可用座位为 [] |
+| POST /reservations | seat_id、start_at、end_at、idempotency_key | 首次 201；同键同规范化载荷重放为 200，同一预约的当前状态 |
+| GET /reservations | 无参数；强制按会话身份过滤 | 200，本人全部预约，start_at 倒序（含取消记录） |
+| GET /reservations/{id} | 本人预约 | 200，单个预约；他人或不存在均 404 |
+| POST /reservations/{id}/cancel | 无需请求体；本人、PENDING_CHECKIN | 200，CANCELLED 预约；重复取消仍 200，不改首次 ended_at 或审计 |
+
+预约输出含 id、student_id、seat_id、room_id、room_name、seat_label、start_at、end_at、status、rule_version_id、rule_snapshot、created_at、checked_in_at、leave_started_at、leave_deadline、ended_at。不输出幂等键，也不输出其他学生身份或冲突记录。未实现的状态操作时间字段保持 null，取消时 ended_at 为首次取消时间。
+
+时间输入严格为 `YYYY-MM-DDTHH:mm:ss[.ffffff]Z` 或相同格式加 `±HH:mm`；拒绝无时区、非法日期、倒置和零长度区间。URL 参数中的 `+` 应编码为 `%2B`（使用 URLSearchParams/urlencode）。先规范化为 UTC 六位微秒 `Z` 再比较和保存。区间 `[start,end)`，两端相邻允许。规则版本和完整 settings 快照保存于预约，不随新规则修改。
+
+服务端当前时间判断：开始不能在过去，最长 240 分钟（含边界），开始日期至多为北京时间今天 +7 日（含第七日，按日历日而非 168 小时）；结束可跨日但整个区间须处于房间每日开放范围内，00:00—24:00 房间允许跨午夜。房间与座位均须启用，已有未重开关闭记录也阻止预约。规则参数从当前最新 rule_versions 集中读取；查询同样使用此校验。取消仅允许 PENDING_CHECKIN；沿用原型按状态判断，不额外设置开始前截止时间。已取消的重放始终返回原取消结果。
+
+查询结果为即时参考，排除未启用座位、关闭座位、与有效预约重叠的座位；本人已有跨座位重叠预约时返回空列表。有效占用状态为 PENDING_CHECKIN、IN_USE、ON_LEAVE；终态不占用。
+
+创建在同一个 BEGIN IMMEDIATE 中依次读取同人幂等键、读取规则与资源、校验时间与启用状态、检查座位及本人重叠、插入预约和关联审计；任一步失败整体回滚。幂等键为 1—100 个有效 UTF-8 字符，按学生隔离。语义载荷为 seat_id、规范化 start_at/end_at，同一时刻的不同偏移表示视为同载荷；异载荷返回 409 IDEMPOTENCY_CONFLICT。重放优先于当前规则/时间校验，返回原记录当前状态，即使已取消也不复活。取消的归属、状态检查、更新与审计同样在一个写事务内完成。
+
+新增错误：400 TIME_INVALID；409 RESOURCE_UNAVAILABLE、RESERVATION_CONFLICT、IDEMPOTENCY_CONFLICT、STATE_NOT_ALLOWED；503 RULES_UNAVAILABLE（当前规则损坏）。现有 401、403、404、DATABASE_BUSY 和事务回滚策略保持有效。
+
 ## 会话和错误
 
 与旧 SRS 的登录 token 返回字段不同，当前采用 HttpOnly、SameSite=Lax Cookie `studyseat_alpha`，Cookie 中只携带签名的随机会话标识，数据库保存其 SHA-256 摘要、用户标识、CSRF 和到期时间。用户与角色从数据库逐请求读取，角色变更或禁用立即作用于后续请求。会话有效 8 小时，登录和退出轮换标识并使旧标识失效。HTTPS 模式启用 Secure。
@@ -42,14 +66,10 @@ FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本�
 
 ## 后续接口草案 尚未实现
 
-以下路径只用于后续联调设计，当前调用返回 404，不能用于首阶段业务验收。
+以下路径保留给后续阶段，当前调用返回 404。
 
 | 方法与路径 | 请求与约束 | 计划输出 |
 | --- | --- | --- |
-| GET /seats?room_id=&start_at=&end_at= | 明确时区，start_at < end_at | 可用座位与服务时间 |
-| POST /reservations | seat_id、start_at、end_at、idempotency_key | 201 预约；相同幂等键与相同载荷返回已有记录；异载荷 409 |
-| GET /reservations | 服务端按本人过滤；管理员另用管理接口 | 本人预约数组 |
-| POST /reservations/{id}/cancel | 本人 + CSRF | 取消回执，重复取消不新增审计 |
 | POST /reservations/{id}/check-in | 本人 + CSRF、签到窗口 | 页面签到回执 |
 | POST /reservations/{id}/leave 或 /return 或 /finish | 本人 + CSRF、状态和时间校验 | 状态回执 |
 | POST /admin/rules | 管理员 + CSRF、完整设置 | 新版本；已有预约保留旧快照 |
@@ -57,4 +77,4 @@ FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本�
 | POST /admin/closures | 管理员 + CSRF、预览摘要 | 事务内复核后关闭；变化时 409 要求重新预览 |
 | POST /admin/closures/{id}/reopen | 管理员 + CSRF | 重新开放，不恢复取消记录 |
 
-后续业务错误预留 409 RESERVATION_CONFLICT、IDEMPOTENCY_CONFLICT、STATE_NOT_ALLOWED、PREVIEW_STALE 和 400 TIME_INVALID。创建、取消、状态迁移、超时和关闭操作均须使用统一事务策略；当前数据库索引和唯一幂等键不能单独防止时段重叠。预约创建需在 `BEGIN IMMEDIATE` 中完成超时补处理、规则/资源校验、座位与学生两类冲突校验、预约和审计写入；必须补充独立连接并发测试后才能标记完成。
+后续操作也须使用统一事务策略；阶段二不执行签到超时补处理、后台任务、管理规则写入或资源关闭。当前创建与取消的事务和独立连接并发已覆盖，详见 [阶段二记录](PHASE2.md)。

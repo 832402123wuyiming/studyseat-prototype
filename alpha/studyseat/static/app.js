@@ -169,12 +169,16 @@ element('logout').addEventListener('click', event => {
 });
 element('note-form').addEventListener('submit', event => {
   event.preventDefault();
-  if (adminDirty && !confirm('保存验证文本会重新加载工作台，确认放弃未保存的规则修改？')) return;
   const content = element('note').value;
   act(event.submitter, async epoch => {
     await api('/persistence-notes', { method: 'POST', body: JSON.stringify({ content }) }, epoch);
     element('note').value = '';
-    await refresh(epoch);
+    if (identityKey.endsWith(':admin')) {
+      // Do not clear management drafts created while the note receipt was in flight.
+      await Promise.all([refreshNotes(epoch), refreshAdmin(epoch)]);
+    } else {
+      await refresh(epoch);
+    }
     if (epoch !== identityGeneration) throw new StaleResponse();
     element('status').textContent = '已保存，可刷新页面验证。';
   });
@@ -217,7 +221,7 @@ async function refreshReservations(epoch, version = ++reservationListGeneration)
           let listVersion;
           act(button, async current => {
             await api(`/reservations/${encodeURIComponent(record.id)}/${action}`, {
-              method: 'POST', body: JSON.stringify({ idempotency_key: key }),
+              method: 'POST', body: JSON.stringify({ idempotency_key: key, ...(['leave', 'return'].includes(action) ? { expected_version: record.state_version } : {}) }),
             }, current);
             listVersion = ++reservationListGeneration;
             invalidateSeats();

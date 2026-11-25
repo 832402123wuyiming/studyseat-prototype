@@ -201,7 +201,7 @@ def close(actor, body, key):
         )
         for record in result["affected"]:
             connection.execute(
-                "UPDATE reservations SET status='CANCELLED',ended_at=? WHERE id=?",
+                "UPDATE reservations SET status='CANCELLED',ended_at=?,state_version=state_version+1 WHERE id=?",
                 (r.utc_text(now), record["id"]),
             )
             event(

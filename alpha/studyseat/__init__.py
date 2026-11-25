@@ -50,8 +50,21 @@ def create_app(test_config=None):
     def expire_reservations(watch, interval):
         from .lifecycle import sweep
 
+        failures = 0
         while True:
-            click.echo(f"Reconciled {len(sweep())} reservations")
+            try:
+                changed = sweep()
+            except sqlite3.OperationalError as error:
+                if not watch or not db.is_busy(error):
+                    raise
+                db.get_db().rollback()
+                failures += 1
+                delay = min(interval * (2 ** min(failures - 1, 5)), 30)
+                click.echo(f"Database busy; retrying in {delay}s (attempt {failures})", err=True)
+                time.sleep(delay)
+                continue
+            failures = 0
+            click.echo(f"Reconciled {len(changed)} reservations")
             if not watch:
                 break
             time.sleep(interval)
@@ -76,7 +89,7 @@ def create_app(test_config=None):
 
     @app.errorhandler(sqlite3.DatabaseError)
     def database_error(error):
-        locked = "locked" in str(error).lower() or "busy" in str(error).lower()
+        locked = db.is_busy(error)
         app.logger.error("Database operation failed: %s", type(error).__name__)
         response = jsonify(
             error={

@@ -112,7 +112,7 @@ P2 独立审查修复了初始化期间编辑查询条件导致房间列表永�
 
 阶段二合并主线之后，在 `codex/phase3-attendance-admin` 开发。功能与验收见 [PHASE3](docs/PHASE3.md)，状态和接口见 [API](docs/API-v1.md)。原型目录仍是模拟演示；真实业务从本 Alpha 服务首页进入。
 
-已有阶段二数据库：先停服务并保留数据库与稳定密钥，备份数据库后使用原环境运行 `python -m flask --app studyseat init-db`，将 v1 原子迁移到 v2，再启动服务。不要删库重建。首次使用仍按上文 `init-db --demo` 初始化。`schema.sql` 保留 v1 原声明，新增 `studyseat/migrations/002_phase3.sql`；同一升级命令可重复执行，不重复生成数据。升级后旧代码不支持 v2，若需回退须停服务并恢复升级前备份。
+已有阶段二数据库：先停服务并保留数据库与稳定密钥，备份数据库后使用原环境运行 `python -m flask --app studyseat init-db`，将 v1/v2 原子迁移到 v3，再启动服务。不要删库重建。首次使用仍按上文 `init-db --demo` 初始化。`schema.sql` 保留 v1 原声明，保留 `studyseat/migrations/002_phase3.sql` 并新增 `003_state_version.sql`；同一升级命令可重复执行，不重复生成数据。升级后旧代码不支持 v3，若需回退须停服务并恢复升级前备份。
 
 另一个终端使用相同 DATABASE 和 SECRET_KEY 环境启动独立超时进程：
 
@@ -129,3 +129,5 @@ python scripts/verify_phase3.py
 ```
 
 Node 与 Playwright 依赖及浏览器选择沿用阶段二。macOS 可设 `STUDYSEAT_BROWSER_CHANNEL=chrome`，Windows 默认 msedge。证据默认存放 `evidence/phase3/`，可用 `STUDYSEAT_EVIDENCE_DIR` 指向一个新的目录，历史阶段二报告不覆盖。验证包括全部后端、格式、原型测试、原有五组浏览器、阶段三跨端浏览器、真实 v1 升级/重启及两个独立超时进程。Windows/Edge 必须实际执行才能计为通过。
+
+本次独立审查修复：暂离/返回使用预约状态版本防止首次迟到请求作用于后续轮次；超时 watch 在临时锁竞争后由同一进程退避恢复；管理员保存验证文本只刷新验证记录和管理读取，保留等待期间的新规则草稿。升级前同时停止 HTTP 服务和任务进程，备份数据库；升级后刷新浏览器以读取新状态前提。不可恢复任务故障仍需操作者或外部进程监管恢复，本轮没有部署监管服务。完整验证已加入 phase3-review-browser.cjs 及真实锁恢复测试，运行时用 STUDYSEAT_EVIDENCE_DIR 指向新目录以保留历史证据。详情见 [独立审查修复记录](docs/PHASE3.md#独立审查修复)。

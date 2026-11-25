@@ -1,0 +1,12 @@
+AssertionError [ERR_ASSERTION]: late note receipt must preserve the new rule draft
+
+'30' !== '45'
+
+    at /Users/zhouyiheng/Desktop/软件工程/studyseat-phase3/alpha/tests/phase3-review-browser.cjs:49:12 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '30',
+  expected: '45',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

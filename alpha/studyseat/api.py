@@ -39,10 +39,10 @@ def index():
 def health():
     connection = get_db()
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    recorded = connection.execute("SELECT version FROM schema_versions WHERE version=2").fetchone()
-    if version != 2 or recorded is None:
+    recorded = connection.execute("SELECT version FROM schema_versions WHERE version=3").fetchone()
+    if version != 3 or recorded is None:
         raise ApiError(503, "DATABASE_UNAVAILABLE", "数据库版本未就绪，请检查初始化。")
-    return ok({"status": "ok", "schema_version": 2, "server_time": utc_now()})
+    return ok({"status": "ok", "schema_version": 3, "server_time": utc_now()})
 
 
 @bp.get("/api/v1/auth/session")
@@ -235,7 +235,15 @@ def reservation_action(reservation_id, action):
     if action not in ("check-in", "leave", "return", "finish"):
         raise ApiError(404, "NOT_FOUND", "操作不存在。")
     body = json_body()
-    return ok(lifecycle.transition(g.identity["id"], reservation_id, action, operation_key(body)))
+    return ok(
+        lifecycle.transition(
+            g.identity["id"],
+            reservation_id,
+            action,
+            operation_key(body),
+            body.get("expected_version"),
+        )
+    )
 
 
 @bp.get("/api/v1/admin/reservations")

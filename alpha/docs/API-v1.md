@@ -73,8 +73,8 @@ FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本�
 | 方法与路径 | 请求与约束 | 输出 |
 | --- | --- | --- |
 | POST /reservations/{id}/check-in | student；操作键；快照签到窗口两端包含 | 当前预约；首次签到时间不被重放覆盖 |
-| POST /reservations/{id}/leave | student；操作键；仅使用中，新一轮暂离使用新键 | 暂离中，leave_started_at、leave_deadline |
-| POST /reservations/{id}/return | student；操作键；仅暂离中，截止包含 | 使用中；旧轮次相同键重放不改变新轮次 |
+| POST /reservations/{id}/leave | student；操作键、expected_version；仅使用中，新一轮暂离使用新键 | 暂离中，leave_started_at、leave_deadline |
+| POST /reservations/{id}/return | student；操作键、expected_version；仅暂离中，截止包含且尚未到 end | 使用中；旧轮次相同键重放不改变新轮次 |
 | POST /reservations/{id}/finish | student；操作键；使用中或暂离中 | 已结束；重复结束保留首次 ended_at |
 | GET /admin/reservations | admin | 所有学生的同一份真实预约，含终态 |
 | GET /admin/resources | admin | seats 和 closures（包括已重新开放记录） |
@@ -97,3 +97,13 @@ FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本�
 关闭是立即生效、持续到手动重新开放的最小实现，不提供未来定时关闭。预览签名绑定管理员、资源、原因及当时影响摘要，300 秒失效；确认不接受替换范围。确认锁内校验原始影响摘要、资源和关闭记录，新增预约、取消或签到都会令旧预览失效。预览本身不执行超时或审计写入；数据已到期需刷新管理数据补处理后重新预览。使用中与暂离中阻断关闭，沿用当前原型，和旧 SRS 差异仍待团队确认。关闭记录、取消的待签到预约及对应审计整体提交；重新开放不复活已取消记录。通知仅为站内操作记录，没有真实投递。
 
 新增错误：409 RULE_VERSION_CONFLICT、RESOURCE_CHANGED、RESERVATIONS_AFFECTED、PREVIEW_STALE、RESOURCE_IN_USE；保留既有 AUTH_REQUIRED、FORBIDDEN、CSRF_INVALID、NOT_FOUND、DATABASE_BUSY 等契约。验证步骤与本轮结果见 [PHASE3.md](PHASE3.md)。
+
+## 阶段三独立审查补充契约
+
+数据库 v3 新增预约 state_version（非负整数，旧记录从 0 开始）。创建初始为 0，签到、暂离、返回、结束、取消、资源关闭取消与超时实际改变状态时加 1；无副作用的重复操作不递增。列表、详情及写入返回均含该字段。
+
+leave/return 必须发送 `{idempotency_key, expected_version}`，expected_version 取自该次操作观察到的预约快照；缺失、布尔、负数或非整数为 400 INVALID_INPUT。服务端在 BEGIN IMMEDIATE 内先补处理超时、核对原操作回执，再比较预期版本与当前版本。首次迟到/并发旧版本为 409 STALE_RESERVATION，不改当前轮次、暂离截止或新增回执/操作审计；若已超时，合法超时结果仍提交。相同操作键必须绑定同一 expected_version、操作及预约，异前提返回 409 IDEMPOTENCY_CONFLICT。已记录的同键同前提重放返回当前预约，不重新执行旧暂离/返回。签到和结束无循环风险，既有幂等输入保持有效。
+
+v1/v2 数据与历史回执升级时保留；历史 leave/return 回执不补造缺失的轮次前提。升级后刷新客户端，新的界面读取 state_version 并生成新操作键；旧客户端缺少前提会被拒绝，不能静默按最新版本替换旧请求。
+
+expire-reservations --watch 遇到 SQLITE_BUSY/SQLITE_LOCKED 会回滚、输出重试信息并有界指数退避（首次为 min(interval,30) 秒、最多 30 秒），成功后恢复正常间隔。单次模式锁忙与不可恢复数据库错误仍非零退出；不吞掉数据库损坏或审计完整性错误。

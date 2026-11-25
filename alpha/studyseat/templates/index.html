@@ -40,7 +40,7 @@
           <p id="availability" role="status">请先查询。</p>
           <form id="booking-form" hidden><label for="seat-id">可预约座位</label><select id="seat-id" required></select><button type="submit">创建预约</button></form>
           <div class="row"><h3>我的预约</h3><button id="reload-reservations" class="secondary">刷新预约</button></div>
-          <p class="muted">签到窗口及暂离截止按预约创建时的规则执行。截止时刻允许操作；最终以服务端时间和状态为准。</p>
+          <p class="muted">签到窗口及暂离截止按预约创建时的规则执行。截止时刻且预约尚未结束时允许操作；最终以服务端时间和状态为准。</p>
           <ul id="reservations"></ul>
         </section>
         <h3>数据持久化验证</h3><p class="muted">保存一条文本后刷新，或重启服务再登录查看。这些是验证记录，不是预约。</p>

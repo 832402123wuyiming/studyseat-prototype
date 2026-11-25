@@ -6,6 +6,27 @@ from pathlib import Path
 from flask import current_app, g
 
 
+def is_busy(error):
+    if not isinstance(error, sqlite3.OperationalError):
+        return False
+    code = getattr(error, "sqlite_errorcode", None)
+    if code is not None:
+        return code & 0xFF in (5, 6)  # SQLITE_BUSY / SQLITE_LOCKED, including extended codes.
+    # Python 3.10 has no sqlite_errorcode attribute.
+    return (
+        str(error)
+        .lower()
+        .startswith(
+            (
+                "database is locked",
+                "database table is locked",
+                "database schema is locked",
+                "database is busy",
+            )
+        )
+    )
+
+
 def utc_now():
     return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
@@ -41,14 +62,14 @@ def initialize():
     connection = get_db()
     connection.execute("PRAGMA journal_mode = WAL")
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if version not in (0, 1, 2):
+    if version not in (0, 1, 2, 3):
         raise RuntimeError("Unsupported database schema version")
     schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
     try:
         connection.executescript("BEGIN IMMEDIATE;\n" + schema)
         # Another initializer may have upgraded while this process waited for its lock.
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1, 2):
+        if version not in (0, 1, 2, 3):
             raise RuntimeError("Unsupported database schema version")
         connection.execute("INSERT OR IGNORE INTO schema_versions VALUES (1, ?)", (utc_now(),))
         if version < 2:
@@ -59,7 +80,13 @@ def initialize():
                 if statement.strip():
                     connection.execute(statement)
             connection.execute("INSERT INTO schema_versions VALUES (2, ?)", (utc_now(),))
-        connection.execute("PRAGMA user_version = 2")
+        if version < 3:
+            migration = Path(__file__).with_name("migrations") / "003_state_version.sql"
+            for statement in migration.read_text(encoding="utf-8").split(";"):
+                if statement.strip():
+                    connection.execute(statement)
+            connection.execute("INSERT INTO schema_versions VALUES (3, ?)", (utc_now(),))
+        connection.execute("PRAGMA user_version = 3")
         connection.commit()
     except Exception:
         connection.rollback()

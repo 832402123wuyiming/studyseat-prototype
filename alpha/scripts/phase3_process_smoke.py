@@ -67,7 +67,7 @@ def main():
         )
         assert migrated.returncode == 0, migrated.stdout + migrated.stderr
         with sqlite3.connect(database) as db:
-            assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+            assert db.execute("PRAGMA user_version").fetchone()[0] == 3
             assert db.execute("SELECT COUNT(*) FROM reservations").fetchone()[0] == 1
             assert db.execute("SELECT action,details_json FROM audit_events").fetchone() == (
                 "RESERVATION_CREATED",
@@ -134,8 +134,14 @@ def main():
             csrf = request("/auth/login", {"username": "832402116", "password": "123456"}, csrf)[
                 "csrf_token"
             ]
-            request("/reservations/v1-reservation/check-in", {"idempotency_key": "checkin"}, csrf)
-            left = request("/reservations/v1-reservation/leave", {"idempotency_key": "leave"}, csrf)
+            checked = request(
+                "/reservations/v1-reservation/check-in", {"idempotency_key": "checkin"}, csrf
+            )
+            left = request(
+                "/reservations/v1-reservation/leave",
+                {"idempotency_key": "leave", "expected_version": checked["state_version"]},
+                csrf,
+            )
             assert left["status"] == "ON_LEAVE"
         finally:
             first.terminate()
@@ -146,11 +152,17 @@ def main():
             assert request("/me")["id"] == "student01"
             assert request("/reservations/v1-reservation") == left
             assert (
-                request("/reservations/v1-reservation/leave", {"idempotency_key": "leave"}, csrf)
+                request(
+                    "/reservations/v1-reservation/leave",
+                    {"idempotency_key": "leave", "expected_version": checked["state_version"]},
+                    csrf,
+                )
                 == left
             )
             returned = request(
-                "/reservations/v1-reservation/return", {"idempotency_key": "return"}, csrf
+                "/reservations/v1-reservation/return",
+                {"idempotency_key": "return", "expected_version": left["state_version"]},
+                csrf,
             )
             assert returned["status"] == "IN_USE"
             done = request(
@@ -215,7 +227,7 @@ def main():
             "service_pids": [first.pid, second.pid],
             "worker_pids": [a.pid, b.pid],
             "checks": [
-                "real v1 reservation/audit migrated to v2 without loss",
+                "real v1 reservation/audit migrated to v3 without loss",
                 "HTTP checkin/leave",
                 "session and leave state survive service restart",
                 "same leave key retains original deadline after restart",

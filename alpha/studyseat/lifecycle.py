@@ -57,7 +57,7 @@ def reconcile(connection, now):
         if result:
             status, effective, action = result
             connection.execute(
-                "UPDATE reservations SET status=?,ended_at=? WHERE id=?",
+                "UPDATE reservations SET status=?,ended_at=?,state_version=state_version+1 WHERE id=?",
                 (status, r.utc_text(effective), record["id"]),
             )
             event(
@@ -78,7 +78,10 @@ def sweep():
         return reconcile(connection, r.now_utc())
 
 
-def transition(student_id, reservation_id, action, key):
+def transition(student_id, reservation_id, action, key, expected_version=None):
+    cyclic = action in ("leave", "return")
+    if cyclic and (type(expected_version) is not int or expected_version < 0):
+        raise ApiError(400, "INVALID_INPUT", "页面状态凭据无效，请刷新预约后重试。")
     # Due transitions and the requested action share one lock. A state error is
     # raised after commit so a rejected late action cannot roll back its timeout.
     with write_transaction() as connection:
@@ -87,13 +90,19 @@ def transition(student_id, reservation_id, action, key):
         reconcile(connection, now)
         record = r.owned(connection, student_id, reservation_id)
         payload = {"reservation_id": reservation_id}
+        if cyclic:
+            payload["expected_version"] = expected_version
         if replay(connection, student_id, key, action, payload):
             return record
         settings = snapshot(record)
         status = record["status"]
         error = None
+        error_code = "STATE_NOT_ALLOWED"
         updates = None
-        if action == "check-in":
+        if cyclic and record["state_version"] != expected_version:
+            error_code = "STALE_RESERVATION"
+            error = "预约状态已改变，请刷新后按当前状态重新操作。"
+        elif action == "check-in":
             if record["checked_in_at"] is not None:
                 pass  # Retry cannot return from leave or revive a terminal reservation.
             elif status != "PENDING_CHECKIN":
@@ -138,7 +147,8 @@ def transition(student_id, reservation_id, action, key):
             if updates:
                 sql, parameters = updates
                 connection.execute(
-                    f"UPDATE reservations SET {sql} WHERE id=?", (*parameters, reservation_id)
+                    f"UPDATE reservations SET {sql},state_version=state_version+1 WHERE id=?",
+                    (*parameters, reservation_id),
                 )
                 event(
                     connection,
@@ -156,5 +166,5 @@ def transition(student_id, reservation_id, action, key):
             remember(connection, student_id, key, action, reservation_id, payload, now)
             record = r.owned(connection, student_id, reservation_id)
     if error:
-        raise ApiError(409, "STATE_NOT_ALLOWED", error)
+        raise ApiError(409, error_code, error)
     return record

@@ -1,0 +1,211 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_________ test_first_delayed_command_cannot_change_later_cycle[leave] __________
+
+app = <Flask 'studyseat'>, client = <FlaskClient <Flask 'studyseat'>>
+clock = [datetime.datetime(2026, 11, 25, 2, 1, tzinfo=datetime.timezone.utc)]
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109302060>
+action = 'leave'
+
+    @pytest.mark.parametrize("action", ["leave", "return"])
+    def test_first_delayed_command_cannot_change_later_cycle(app, client, clock, monkeypatch, action):
+        headers = base.auth(client)
+        second = app.test_client()
+        second_headers = base.auth(second)
+        record = base.book(client, headers)
+        clock[0] = base.START
+        assert command(client, headers, record, "check-in", "check").status_code == 200
+        if action == "return":
+            assert command(client, headers, current(app, record), "leave", "leave-1").status_code == 200
+        observed = current(app, record)
+        ready, release = threading.Event(), threading.Event()
+        local = threading.local()
+        connections = set()
+        original = lifecycle.write_transaction
+    
+        @contextmanager
+        def controlled():
+            connections.add(id(get_db()))
+            if getattr(local, "delay", False):
+                ready.set()
+                assert release.wait(timeout=10)
+            with original() as db:
+                yield db
+    
+        monkeypatch.setattr(lifecycle, "write_transaction", controlled)
+    
+        def delayed():
+            local.delay = True
+            return command(client, headers, observed, action, "first-delayed-key")
+    
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            waiting = executor.submit(delayed)
+            try:
+                assert ready.wait(timeout=5)
+                clock[0] += timedelta(minutes=1)
+                if action == "leave":
+                    assert command(second, second_headers, observed, "leave", "other-leave").status_code == 200
+                    assert command(second, second_headers, current(app, record), "return", "other-return").status_code == 200
+                else:
+                    assert command(second, second_headers, observed, "return", "other-return").status_code == 200
+                    assert command(second, second_headers, current(app, record), "leave", "leave-2").status_code == 200
+                before = current(app, record)
+                audits = base.rows(app, "audit_events")
+                receipts = base.rows(app, "operation_receipts")
+            finally:
+                release.set()
+            response = waiting.result(timeout=10)
+>       assert response.status_code == 409, response.json
+E       AssertionError: {'data': {'checked_in_at': '2026-11-25T02:00:00.000000Z', 'created_at': '2026-11-25T01:00:00.000000Z', 'end_at': '2026-11-25T04:00:00.000000Z', 'ended_at': None, ...}}
+E       assert 200 == 409
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_phase3_review.py:92: AssertionError
+_________ test_first_delayed_command_cannot_change_later_cycle[return] _________
+
+app = <Flask 'studyseat'>, client = <FlaskClient <Flask 'studyseat'>>
+clock = [datetime.datetime(2026, 11, 25, 2, 1, tzinfo=datetime.timezone.utc)]
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x109bec180>
+action = 'return'
+
+    @pytest.mark.parametrize("action", ["leave", "return"])
+    def test_first_delayed_command_cannot_change_later_cycle(app, client, clock, monkeypatch, action):
+        headers = base.auth(client)
+        second = app.test_client()
+        second_headers = base.auth(second)
+        record = base.book(client, headers)
+        clock[0] = base.START
+        assert command(client, headers, record, "check-in", "check").status_code == 200
+        if action == "return":
+            assert command(client, headers, current(app, record), "leave", "leave-1").status_code == 200
+        observed = current(app, record)
+        ready, release = threading.Event(), threading.Event()
+        local = threading.local()
+        connections = set()
+        original = lifecycle.write_transaction
+    
+        @contextmanager
+        def controlled():
+            connections.add(id(get_db()))
+            if getattr(local, "delay", False):
+                ready.set()
+                assert release.wait(timeout=10)
+            with original() as db:
+                yield db
+    
+        monkeypatch.setattr(lifecycle, "write_transaction", controlled)
+    
+        def delayed():
+            local.delay = True
+            return command(client, headers, observed, action, "first-delayed-key")
+    
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            waiting = executor.submit(delayed)
+            try:
+                assert ready.wait(timeout=5)
+                clock[0] += timedelta(minutes=1)
+                if action == "leave":
+                    assert command(second, second_headers, observed, "leave", "other-leave").status_code == 200
+                    assert command(second, second_headers, current(app, record), "return", "other-return").status_code == 200
+                else:
+                    assert command(second, second_headers, observed, "return", "other-return").status_code == 200
+                    assert command(second, second_headers, current(app, record), "leave", "leave-2").status_code == 200
+                before = current(app, record)
+                audits = base.rows(app, "audit_events")
+                receipts = base.rows(app, "operation_receipts")
+            finally:
+                release.set()
+            response = waiting.result(timeout=10)
+>       assert response.status_code == 409, response.json
+E       AssertionError: {'data': {'checked_in_at': '2026-11-25T02:00:00.000000Z', 'created_at': '2026-11-25T01:00:00.000000Z', 'end_at': '2026-11-25T04:00:00.000000Z', 'ended_at': None, ...}}
+E       assert 200 == 409
+E        +  where 200 = <WrapperTestResponse streamed [200 OK]>.status_code
+
+tests/test_phase3_review.py:92: AssertionError
+_________ test_watch_recovers_after_real_busy_timeout_without_restart __________
+
+app = <Flask 'studyseat'>, client = <FlaskClient <Flask 'studyseat'>>
+clock = [datetime.datetime(2026, 11, 25, 1, 0, tzinfo=datetime.timezone.utc)]
+
+    def test_watch_recovers_after_real_busy_timeout_without_restart(app, client, clock):
+        headers = base.auth(client)
+        record = base.book(client, headers)
+        environment = dict(os.environ, STUDYSEAT_DATABASE=app.config["DATABASE"],
+                           STUDYSEAT_SECRET_KEY=app.config["SECRET_KEY"])
+        # Force a real past-due fixture; only the CLI may expire it after the lock is released.
+        with sqlite3.connect(app.config["DATABASE"]) as db:
+            db.execute("UPDATE reservations SET start_at='2000-01-01T00:00:00.000000Z',end_at='2000-01-01T01:00:00.000000Z' WHERE id=?", (record["id"],))
+        blocker = sqlite3.connect(app.config["DATABASE"], isolation_level=None)
+        blocker.execute("BEGIN IMMEDIATE")
+        process = subprocess.Popen(
+            [sys.executable, "-m", "flask", "--app", "studyseat", "expire-reservations", "--watch", "--interval", "1"],
+            cwd=Path(__file__).parents[1], env=environment, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, bufsize=1,
+        )
+        output, messages = [], queue.Queue()
+        reader = threading.Thread(target=lambda: [messages.put(line) for line in process.stdout], daemon=True)
+        reader.start()
+    
+        def until(text):
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                try:
+                    line = messages.get(timeout=0.1)
+                    output.append(line.strip())
+                    if text in line:
+                        return True
+                except queue.Empty:
+                    if process.poll() is not None:
+                        break
+            return False
+    
+        try:
+>           assert until("retrying"), "\n".join(output)
+E           AssertionError: Traceback (most recent call last):
+E             File "<frozen runpy>", line 203, in _run_module_as_main
+E             File "<frozen runpy>", line 88, in _run_code
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/flask/__main__.py", line 3, in <module>
+E             main()
+E             ~~~~^^
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/flask/cli.py", line 1131, in main
+E             cli.main()
+E             ~~~~~~~~^^
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/click/core.py", line 1560, in main
+E             rv = self.invoke(ctx)
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/click/core.py", line 2054, in invoke
+E             return _process_result(sub_ctx.command.invoke(sub_ctx))
+E             ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/click/core.py", line 1414, in invoke
+E             return ctx.invoke(self.callback, **ctx.params)
+E             ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/click/core.py", line 911, in invoke
+E             return callback(*args, **kwargs)
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/click/decorators.py", line 34, in new_func
+E             return f(get_current_context(), *args, **kwargs)
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/flask/cli.py", line 400, in decorator
+E             return ctx.invoke(f, *args, **kwargs)
+E             ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+E             File "/private/tmp/studyseat-phase3-venv/lib/python3.13/site-packages/click/core.py", line 911, in invoke
+E             return callback(*args, **kwargs)
+E             File "/Users/zhouyiheng/Desktop/软件工程/studyseat-phase3/alpha/studyseat/__init__.py", line 54, in expire_reservations
+E             click.echo(f"Reconciled {len(sweep())} reservations")
+E             ~~~~~^^
+E             File "/Users/zhouyiheng/Desktop/软件工程/studyseat-phase3/alpha/studyseat/lifecycle.py", line 77, in sweep
+E             with write_transaction() as connection:
+E             ~~~~~~~~~~~~~~~~~^^
+E             File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 141, in __enter__
+E             return next(self.gen)
+E             File "/Users/zhouyiheng/Desktop/软件工程/studyseat-phase3/alpha/studyseat/db.py", line 31, in write_transaction
+E             connection.execute("BEGIN IMMEDIATE")
+E             ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+E             sqlite3.OperationalError: database is locked
+E           assert False
+E            +  where False = <function test_watch_recovers_after_real_busy_timeout_without_restart.<locals>.until at 0x109ba9c60>('retrying')
+
+tests/test_phase3_review.py:135: AssertionError
+- generated xml file: /Users/zhouyiheng/Desktop/软件工程/studyseat-phase3/alpha/evidence/phase3-review/pre-fix/pytest.xml -
+=========================== short test summary info ============================
+FAILED tests/test_phase3_review.py::test_first_delayed_command_cannot_change_later_cycle[leave]
+FAILED tests/test_phase3_review.py::test_first_delayed_command_cannot_change_later_cycle[return]
+FAILED tests/test_phase3_review.py::test_watch_recovers_after_real_busy_timeout_without_restart
+3 failed in 6.83s

@@ -46,11 +46,24 @@ def book(client, headers, **changes):
 
 
 def act(client, headers, record, action, key=None):
-    return client.post(
-        BASE + f"/reservations/{record['id']}/{action}",
-        headers=headers,
-        json={"idempotency_key": key or action},
-    )
+    key = key or action
+    body = {"idempotency_key": key}
+    if action in ("leave", "return"):
+        with client.application.app_context():
+            db = get_db()
+            receipt = db.execute(
+                "SELECT payload_json FROM operation_receipts WHERE actor_id=? AND idempotency_key=? AND operation=?",
+                (record["student_id"], key, action),
+            ).fetchone()
+            # Replays retain their original precondition; new commands observe current state.
+            body["expected_version"] = (
+                json.loads(receipt[0])["expected_version"]
+                if receipt
+                else db.execute(
+                    "SELECT state_version FROM reservations WHERE id=?", (record["id"],)
+                ).fetchone()[0]
+            )
+    return client.post(BASE + f"/reservations/{record['id']}/{action}", headers=headers, json=body)
 
 
 def admin_post(client, headers, path, **body):
@@ -411,9 +424,9 @@ def test_migration_v1_is_additive_and_repeated_initialization_safe(tmp_path):
         initialize()
         initialize()
         db = get_db()
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
         assert db.execute("SELECT content FROM persistence_notes").fetchone()[0] == "retained"
-        assert db.execute("SELECT COUNT(*) FROM schema_versions").fetchone()[0] == 2
+        assert db.execute("SELECT COUNT(*) FROM schema_versions").fetchone()[0] == 3
 
 
 def test_independent_connections_checkin_and_timeout_race(client, app, clock):
@@ -741,9 +754,9 @@ def test_concurrent_initializers_recheck_schema_under_lock(tmp_path, monkeypatch
             return get_db().execute("PRAGMA user_version").fetchone()[0]
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        assert list(executor.map(upgrade, range(2))) == [2, 2]
+        assert list(executor.map(upgrade, range(2))) == [3, 3]
     with app.app_context():
-        assert get_db().execute("SELECT COUNT(*) FROM schema_versions").fetchone()[0] == 2
+        assert get_db().execute("SELECT COUNT(*) FROM schema_versions").fetchone()[0] == 3
 
 
 @pytest.mark.parametrize(

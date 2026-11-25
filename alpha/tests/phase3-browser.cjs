@@ -109,7 +109,7 @@ async function hold(page, endpoint, failure = false) {
     await login(student, 'B');
     assert.equal(await student.locator('#reservations li').count(), 0);
     for (const action of ['check-in', 'leave', 'return', 'finish']) {
-      assert.equal((await request(student, `/reservations/${first.id}/${action}`, { idempotency_key: action })).status, 404);
+      assert.equal((await request(student, `/reservations/${first.id}/${action}`, { idempotency_key: action, expected_version: 0 })).status, 404);
     }
     assert.equal((await request(student, '/admin/reservations')).status, 403);
     checks.push('账号 B 看不到 A 的记录，四种状态操作均 404，管理读取 403');
@@ -125,8 +125,9 @@ async function hold(page, endpoint, failure = false) {
     assert.equal(await admin.locator('#dashboard').isVisible(), true);
     assert.equal(await admin.locator('#rule-leave').inputValue(), '45');
     await admin.locator('#note').fill('保护未保存规则');
-    admin.once('dialog', dialog => dialog.dismiss());
     await admin.locator('#note-form button').click();
+    await contains(admin, 'notes', '保护未保存规则');
+    await contains(admin, 'status', '已保存，可刷新');
     assert.equal(await admin.locator('#rule-leave').inputValue(), '45');
     await admin.locator('#rules-form button[type="submit"]').click();
     await contains(admin, 'status', '规则已保存');

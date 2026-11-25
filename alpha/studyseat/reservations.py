@@ -243,7 +243,7 @@ def cancel(student_id, reservation_id):
         allowed = record["status"] == "PENDING_CHECKIN"
         if allowed:
             connection.execute(
-                "UPDATE reservations SET status='CANCELLED', ended_at=? WHERE id=?",
+                "UPDATE reservations SET status='CANCELLED', ended_at=?,state_version=state_version+1 WHERE id=?",
                 (utc_text(now), reservation_id),
             )
             audit(connection, student_id, reservation_id, "RESERVATION_CANCELLED", now)

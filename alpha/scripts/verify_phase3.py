@@ -170,6 +170,7 @@ def main():
             "initialization-browser.cjs",
             "reservation-list-browser.cjs",
             "phase3-browser.cjs",
+            "phase3-review-browser.cjs",
         ):
             browser_case(directory, script)
         prototype_browser(directory)
@@ -178,7 +179,7 @@ def main():
         "executed_at": datetime.now(timezone.utc).isoformat(),
         "python": sys.version,
         "browser_channel": os.environ.get("STUDYSEAT_BROWSER_CHANNEL", "msedge"),
-        "scope": "pytest, Ruff, JS syntax, prototype tests, real restart, foundation/account-switch/reservation/initialization/reservation-list/phase3 browsers, phase3 migration/restart/timeout process, prototype browser",
+        "scope": "pytest, Ruff, JS syntax, prototype tests, real restart, foundation/account-switch/reservation/initialization/reservation-list/phase3/phase3-review browsers, phase3 migration/restart/timeout process, prototype browser",
         "database_isolation": "pytest tmp_path; restart TemporaryDirectory; one fresh file per browser suite",
     }
     report["runtime"] = {

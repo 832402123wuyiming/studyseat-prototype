@@ -2,7 +2,8 @@ import uuid
 
 from flask import Blueprint, g, jsonify, render_template, request
 
-from . import reservations
+from . import admin as admin_service
+from . import attendance, reservations
 from .auth import ApiError, activate_session, authenticate, check_csrf, new_session, require_role
 from .db import get_db, utc_now, write_transaction
 
@@ -192,7 +193,7 @@ def my_reservations():
 @bp.get("/api/v1/reservations/<reservation_id>")
 @require_role("student")
 def my_reservation(reservation_id):
-    return ok(reservations.owned(get_db(), g.identity["id"], reservation_id))
+    return ok(reservations.get_owned(g.identity["id"], reservation_id))
 
 
 @bp.post("/api/v1/reservations")
@@ -217,3 +218,71 @@ def create_reservation():
 def cancel_reservation(reservation_id):
     check_csrf()
     return ok(reservations.cancel(g.identity["id"], reservation_id))
+
+
+@bp.post("/api/v1/reservations/<reservation_id>/check-in")
+@require_role("student")
+def check_in_reservation(reservation_id):
+    check_csrf()
+    return ok(attendance.check_in(g.identity["id"], reservation_id))
+
+
+@bp.post("/api/v1/reservations/<reservation_id>/leave")
+@require_role("student")
+def leave_reservation(reservation_id):
+    check_csrf()
+    return ok(attendance.leave(g.identity["id"], reservation_id))
+
+
+@bp.post("/api/v1/reservations/<reservation_id>/return")
+@require_role("student")
+def return_reservation(reservation_id):
+    check_csrf()
+    return ok(attendance.return_to_seat(g.identity["id"], reservation_id))
+
+
+@bp.post("/api/v1/reservations/<reservation_id>/finish")
+@require_role("student")
+def finish_reservation(reservation_id):
+    check_csrf()
+    return ok(attendance.finish(g.identity["id"], reservation_id))
+
+
+@bp.post("/api/v1/admin/rules")
+@require_role("admin")
+def update_rules():
+    check_csrf()
+    return ok(admin_service.update_rules(g.identity["id"], json_body()))
+
+
+@bp.get("/api/v1/admin/resources")
+@require_role("admin")
+def admin_resources():
+    return ok(admin_service.resources())
+
+
+@bp.get("/api/v1/admin/closures")
+@require_role("admin")
+def admin_closures():
+    return ok(admin_service.closures())
+
+
+@bp.post("/api/v1/admin/closures/preview")
+@require_role("admin")
+def preview_closure():
+    check_csrf()
+    return ok(admin_service.preview(g.identity["id"], json_body()))
+
+
+@bp.post("/api/v1/admin/closures")
+@require_role("admin")
+def create_closure():
+    check_csrf()
+    return ok(admin_service.close(g.identity["id"], json_body()), 201)
+
+
+@bp.post("/api/v1/admin/closures/<closure_id>/reopen")
+@require_role("admin")
+def reopen_closure(closure_id):
+    check_csrf()
+    return ok(admin_service.reopen(g.identity["id"], closure_id))

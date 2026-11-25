@@ -272,14 +272,18 @@ def test_cancel_rejects_other_states(app, client, status):
     assert count(app, "audit_events", "action='RESERVATION_CANCELLED'") == 0
 
 
-@pytest.mark.parametrize("days,minutes", [(1, 0), (1, 15), (2, 0)])
-def test_pending_cancel_at_and_after_start(client, monkeypatch, days, minutes):
+@pytest.mark.parametrize("days,minutes,status", [(1, 0, 200), (1, 15, 200), (2, 0, 409)])
+def test_pending_cancel_at_and_after_start(client, monkeypatch, days, minutes, status):
     headers = student(client)
     record = post(client, headers).json["data"]
     monkeypatch.setattr(
         reservations, "now_utc", lambda: NOW + timedelta(days=days, minutes=minutes)
     )
-    assert client.post(BASE + "/" + record["id"] + "/cancel", headers=headers).status_code == 200
+    response = client.post(BASE + "/" + record["id"] + "/cancel", headers=headers)
+    assert response.status_code == status
+    if status == 409:
+        assert response.json["error"]["code"] == "STATE_NOT_ALLOWED"
+        assert client.get(BASE + "/" + record["id"]).json["data"]["status"] == "EXPIRED"
 
 
 def test_rule_snapshot_and_latest_rule(app, client):

@@ -60,21 +60,36 @@ FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本�
 | 403 | FORBIDDEN | 角色无权限 |
 | 403 | CSRF_INVALID | CSRF 缺失或不匹配 |
 | 404 | NOT_FOUND | 记录不存在或不归本人；未知路径也返回 JSON 404 |
+| 409 | STATE_NOT_ALLOWED | 当前状态或时间窗口不允许该操作 |
+| 409 | ALREADY_CLOSED | 资源已有未重开的关闭记录 |
+| 409 | CLOSURE_BLOCKED | 仍有使用中或暂离中的预约，不能关闭 |
+| 409 | PREVIEW_STALE | 关闭影响已变化，需要重新预览 |
+| 409 | PREVIEW_INVALID / PREVIEW_EXPIRED | 预览凭据被篡改或超过 5 分钟 |
 | 413 | REQUEST_ENTITY_TOO_LARGE | 请求体超过 8 KiB |
 | 503 | DATABASE_BUSY | 锁等待超过 5 秒，Retry-After: 1；写入未成功 |
 | 503 | DATABASE_UNAVAILABLE / NOT_INITIALIZED | 数据库未就绪或缺少初始化数据 |
 
-## 后续接口草案 尚未实现
+## 阶段三使用与管理接口 已实现
 
-以下路径保留给后续阶段，当前调用返回 404。
+签到、暂离、返回、结束均要求本人学生会话和 CSRF；管理员和学生角色互斥。每次操作在 `BEGIN IMMEDIATE` 中先执行超时释放，再校验归属与状态，更新和审计同一事务提交。重复操作返回当前记录，不覆盖首次有效时间、不重复审计。
 
-| 方法与路径 | 请求与约束 | 计划输出 |
+| 方法与路径 | 请求与约束 | 成功输出 |
 | --- | --- | --- |
-| POST /reservations/{id}/check-in | 本人 + CSRF、签到窗口 | 页面签到回执 |
-| POST /reservations/{id}/leave 或 /return 或 /finish | 本人 + CSRF、状态和时间校验 | 状态回执 |
-| POST /admin/rules | 管理员 + CSRF、完整设置 | 新版本；已有预约保留旧快照 |
-| POST /admin/closures/preview | 管理员 + CSRF、范围与原因 | 影响清单和摘要，不写数据 |
-| POST /admin/closures | 管理员 + CSRF、预览摘要 | 事务内复核后关闭；变化时 409 要求重新预览 |
-| POST /admin/closures/{id}/reopen | 管理员 + CSRF | 重新开放，不恢复取消记录 |
+| POST /reservations/{id}/check-in | 本人、PENDING_CHECKIN、当前时间在 `[开始−提前, 开始+延后]` 闭区间内 | 200，IN_USE；`checked_in_at` 为首次签到时间 |
+| POST /reservations/{id}/leave | 本人、IN_USE、未到结束时间 | 200，ON_LEAVE；`leave_deadline` 为当前时间加暂离上限 |
+| POST /reservations/{id}/return | 本人、ON_LEAVE、未严格超过 `leave_deadline` | 200，IN_USE；清除暂离时间字段 |
+| POST /reservations/{id}/finish | 本人、IN_USE 或 ON_LEAVE | 200，COMPLETED；`ended_at` 为首次结束时间 |
+| POST /admin/rules | 管理员、CSRF、完整五项整数设置 | 200，新 `version` 和 `settings`；已有预约保留旧快照 |
+| GET /admin/resources | 管理员 | 房间与座位目录，供关闭范围选择 |
+| GET /admin/closures | 管理员 | 关闭记录，含房间/座位、原因、创建人、重开时间 |
+| POST /admin/closures/preview | 管理员、CSRF、`room_id` 或 `seat_id` 二选一、原因 | 200，影响清单、`can_apply`、5 分钟签名 `token`；不写业务数据 |
+| POST /admin/closures | 管理员、CSRF、范围、原因、预览 `token` | 201，关闭记录和已取消预约 ID；待签到预约转为 CANCELLED |
+| POST /admin/closures/{id}/reopen | 管理员、CSRF | 200，`reopened_at`；不恢复已取消预约，重复调用保持首次时间 |
 
-后续操作也须使用统一事务策略；阶段二不执行签到超时补处理、后台任务、管理规则写入或资源关闭。当前创建与取消的事务和独立连接并发已覆盖，详见 [阶段二记录](PHASE2.md)。
+超时释放由服务端在读列表、查询余量、创建、取消和状态操作前统一执行：PENDING_CHECKIN 严格超过签到截止转为 EXPIRED；ON_LEAVE 严格超过暂离截止转为 EXPIRED；IN_USE/ON_LEAVE 到达结束时刻转为 COMPLETED。恰好处于截止时刻仍允许签到或返回。终态不能复活，释放后座位可被重新预约。审计动作分别为 RESERVATION_CHECKED_IN、RESERVATION_LEFT、RESERVATION_RETURNED、RESERVATION_COMPLETED、RESERVATION_EXPIRED、RESERVATION_AUTO_COMPLETED、RESERVATION_CLOSED、RESOURCE_CLOSED、RESOURCE_REOPENED、RULES_UPDATED。
+
+规则写入只接受完整五项：`max_duration_minutes` 15—1440、`max_advance_days` 0—30、`check_in_early_minutes` 0—120、`check_in_late_minutes` 0—120、`leave_limit_minutes` 1—240，均须为整数，不接受布尔、字符串或小数。新版本只影响之后创建的预约。
+
+关闭预览按服务端当前时间计算“生效状态”，但不写库；`can_apply` 在使用中或暂离中的预约时为 false。确认关闭会重新执行超时释放并按范围、原因、预约 ID/状态/时段重算影响，与 `token` 不一致返回 409；仍有使用中或暂离中预约时拒绝关闭。关闭只取消 PENDING_CHECKIN 预约并写关联审计；房间关闭阻止该房间新预约，座位关闭只阻止该座位。重开只清除关闭状态，不恢复已取消记录。预览与确认的时间上限为 5 分钟，签名基于服务端密钥，篡改或过期均拒绝。
+
+阶段三错误补充：409 STATE_NOT_ALLOWED（状态或时间窗口不允许）、ALREADY_CLOSED、CLOSURE_BLOCKED、PREVIEW_STALE、PREVIEW_INVALID、PREVIEW_EXPIRED。阶段二的事务、幂等和锁等待策略继续有效。

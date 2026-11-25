@@ -1,4 +1,4 @@
-:root { font-family: Inter, "Microsoft YaHei", sans-serif; color: #183254; background: #f5f8ff; font-synthesis: none; }
+﻿:root { font-family: Inter, "Microsoft YaHei", sans-serif; color: #183254; background: #f5f8ff; font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 header, footer { max-width: 1200px; margin: auto; padding: 28px 40px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -44,8 +44,13 @@ footer { border-top: 1px solid #e1e9f6; color: #8999b0; font-size: 12px; }
 @media(max-width: 760px) { header, footer { padding: 22px; } .brand small { display: none; } main { grid-template-columns: 1fr; gap: 12px; padding: 0 20px; margin-top: 8px; } .intro { padding: 0; } h1 { font-size: 32px; } .illustration, .milestones { display: none; } .panel { padding: 24px; } footer { align-items: start; flex-direction: column; } }
 
 #reservations li { margin-bottom: 16px; }
-#reservations button { display: block; margin-top: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+#closures li > button { display: inline-block; margin: 8px 8px 0 0; }
 #availability { font-size: 13px; color: #6e8099; }
 
 #search-fields { display: grid; gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
 #initialization-state { font-size: 13px; color: #6e8099; }
+#closure-impact { white-space: pre-line; }
+#closures li { margin-bottom: 12px; }
+#admin form { margin-top: 14px; }
+

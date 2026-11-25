@@ -6,16 +6,21 @@ let seatQueryGeneration = 0;
 let reservationListGeneration = 0;
 let identityKey = '';
 let pendingBooking = null;
+let adminResources = { rooms: [], seats: [] };
+let closurePreview = null;
 const busyButtons = new WeakMap();
 const element = id => document.getElementById(id);
 class StaleResponse extends Error {}
 
 function clearLoadedData() {
   ++reservationListGeneration;
-  for (const id of ['rooms', 'rules', 'notes', 'events', 'reservations', 'seat-id', 'room-id']) element(id).replaceChildren();
+  for (const id of ['rooms', 'rules', 'notes', 'events', 'reservations', 'seat-id', 'room-id', 'closures', 'closure-target']) element(id).replaceChildren();
   element('admin').hidden = true;
   element('student-booking').hidden = true;
   element('booking-form').hidden = true;
+  element('closure-impact').hidden = true;
+  element('closure-apply').disabled = true;
+  closurePreview = null;
   invalidateSeats();
   element('search-fields').disabled = true;
   element('initialization-state').textContent = '正在加载工作台…';
@@ -52,6 +57,68 @@ function renderList(id, values, format) {
     item.textContent = format(value);
     return item;
   }));
+}
+
+function setRuleInputs(settings) {
+  element('rule-duration').value = settings.max_duration_minutes;
+  element('rule-advance').value = settings.max_advance_days;
+  element('rule-early').value = settings.check_in_early_minutes;
+  element('rule-late').value = settings.check_in_late_minutes;
+  element('rule-leave').value = settings.leave_limit_minutes;
+}
+
+function renderClosureTargets() {
+  const scope = element('closure-scope').value;
+  const values = scope === 'room'
+    ? adminResources.rooms.map(room => ({ id: room.id, label: room.name }))
+    : adminResources.seats.map(seat => ({ id: seat.id, label: `${seat.room_id} · ${seat.label}` }));
+  element('closure-target').replaceChildren(...values.map(value => {
+    const option = document.createElement('option');
+    option.value = value.id;
+    option.textContent = value.label;
+    return option;
+  }));
+  closurePreview = null;
+  element('closure-apply').disabled = true;
+  element('closure-impact').hidden = true;
+}
+
+function renderClosures(records) {
+  element('closures').replaceChildren(...records.map(record => {
+    const item = document.createElement('li');
+    const scope = record.room_id ? `房间 ${record.room_name}` : `座位 ${record.seat_label}`;
+    const reopened = record.reopened_at ? '已重开' : '关闭中';
+    item.textContent = `${scope} · ${record.reason} · ${reopened} · ${beijingTime(record.created_at)}`;
+    if (!record.reopened_at) {
+      const button = document.createElement('button');
+      button.className = 'secondary';
+      button.textContent = '重新开放';
+      button.addEventListener('click', () => act(button, async epoch => {
+        await api(`/admin/closures/${encodeURIComponent(record.id)}/reopen`, { method: 'POST' }, epoch);
+        element('status').textContent = '资源已重新开放，已取消的预约不会恢复。';
+        await refresh(epoch);
+      }));
+      item.append(button);
+    }
+    return item;
+  }));
+  if (!records.length) element('closures').textContent = '还没有关闭记录。';
+}
+
+function closureBody() {
+  const scope = element('closure-scope').value;
+  const body = { reason: element('closure-reason').value.trim() };
+  body[scope === 'room' ? 'room_id' : 'seat_id'] = element('closure-target').value;
+  return body;
+}
+
+function renderClosureImpact(data) {
+  const lines = [`预计取消 ${data.cancellable_count} 条待签到预约；${data.blocking_count} 条使用中或暂离中预约阻止关闭。`];
+  for (const row of data.reservations) {
+    lines.push(`${row.student_name} · ${row.seat_label} · ${beijingTime(row.start_at)} — ${beijingTime(row.end_at)} · ${statusLabels[row.status]}`);
+  }
+  element('closure-impact').textContent = lines.join('\n');
+  element('closure-impact').hidden = false;
 }
 
 async function refreshNotes(epoch) {
@@ -106,7 +173,16 @@ async function refresh(epoch) {
     }
     element('admin').hidden = data.user.role !== 'admin';
     if (data.user.role === 'admin') {
-      renderList('events', await api('/admin/audit-events', {}, epoch), event => `${event.action} · ${event.actor_id} · ${new Date(event.occurred_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`);
+      setRuleInputs(rules.settings);
+      const [resources, closures, events] = await Promise.all([
+        api('/admin/resources', {}, epoch),
+        api('/admin/closures', {}, epoch),
+        api('/admin/audit-events', {}, epoch),
+      ]);
+      adminResources = resources;
+      renderClosureTargets();
+      renderClosures(closures);
+      renderList('events', events, event => `${event.action} · ${event.actor_id} · ${new Date(event.occurred_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`);
     }
     element('search-fields').disabled = data.user.role !== 'student';
     element('initialization-state').textContent = '';
@@ -194,23 +270,31 @@ async function refreshReservations(epoch, version = ++reservationListGeneration)
       const item = document.createElement('li');
       item.dataset.reservationId = record.id;
       item.textContent = `${record.room_name} · ${record.seat_label} · ${beijingTime(record.start_at)} — ${beijingTime(record.end_at)}（北京时间）· ${statusLabels[record.status]} · 规则 v${record.rule_version_id}`;
-      // Cancellation follows the existing pending-only state rule on the server.
-      if (record.status === 'PENDING_CHECKIN') {
+      const leaveLimit = record.rule_snapshot.leave_limit_minutes;
+      const actions = {
+        PENDING_CHECKIN: [['cancel', '取消预约', '已取消，对应时段已释放。'], ['check-in', '签到', '已签到，开始计时。']],
+        IN_USE: [['leave', '暂离', `已暂离，请在 ${leaveLimit} 分钟内返回。`], ['finish', '结束', '已结束使用。']],
+        ON_LEAVE: [['return', '返回', '已返回座位。'], ['finish', '结束', '已结束使用。']],
+      }[record.status] || [];
+      const actionRow = document.createElement('div');
+      actionRow.className = 'actions';
+      for (const [path, label, done] of actions) {
         const button = document.createElement('button');
         button.className = 'secondary';
-        button.textContent = '取消预约';
+        button.textContent = label;
         button.addEventListener('click', () => {
           let listVersion;
           act(button, async current => {
-            await api(`/reservations/${encodeURIComponent(record.id)}/cancel`, { method: 'POST' }, current);
+            await api(`/reservations/${encodeURIComponent(record.id)}/${path}`, { method: 'POST' }, current);
             listVersion = ++reservationListGeneration;
             invalidateSeats();
             const isCurrent = await refreshReservations(current, listVersion);
-            if (isCurrent()) element('status').textContent = '已取消，对应时段已释放。';
+            if (isCurrent()) element('status').textContent = done;
           }, false, () => listVersion === undefined || listVersion === reservationListGeneration);
         });
-        item.append(button);
+        actionRow.append(button);
       }
+      if (actions.length) item.append(actionRow);
       return item;
     }));
     if (!records.length) element('reservations').textContent = '还没有预约，请选择房间和时间查询。';
@@ -313,6 +397,61 @@ element('reload-reservations').addEventListener('click', event => {
   }, false, () => version === reservationListGeneration);
 });
 element('reload-dashboard').addEventListener('click', event => act(event.currentTarget, epoch => refresh(epoch)));
+element('rules-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const body = {
+    max_duration_minutes: Number(element('rule-duration').value),
+    max_advance_days: Number(element('rule-advance').value),
+    check_in_early_minutes: Number(element('rule-early').value),
+    check_in_late_minutes: Number(element('rule-late').value),
+    leave_limit_minutes: Number(element('rule-leave').value),
+  };
+  act(event.submitter, async epoch => {
+    const result = await api('/admin/rules', { method: 'POST', body: JSON.stringify(body) }, epoch);
+    await refresh(epoch);
+    if (epoch !== identityGeneration) throw new StaleResponse();
+    element('status').textContent = `规则已保存为新版本 v${result.version}，已有预约保留原快照。`;
+  });
+});
+element('closure-scope').addEventListener('change', renderClosureTargets);
+element('closure-target').addEventListener('change', () => {
+  closurePreview = null;
+  element('closure-apply').disabled = true;
+  element('closure-impact').hidden = true;
+});
+element('closure-preview').addEventListener('click', event => {
+  const body = closureBody();
+  act(event.currentTarget, async epoch => {
+    const data = await api('/admin/closures/preview', { method: 'POST', body: JSON.stringify(body) }, epoch);
+    closurePreview = { ...body, token: data.token };
+    renderClosureImpact(data);
+    element('closure-apply').disabled = !data.can_apply;
+    element('status').textContent = data.can_apply
+      ? '影响预览已生成，请确认关闭。'
+      : '存在使用中或暂离中的预约，暂不能关闭。';
+  });
+});
+element('closure-apply').addEventListener('click', async event => {
+  if (!closurePreview) return;
+  const button = event.currentTarget;
+  const body = closurePreview;
+  const epoch = identityGeneration;
+  button.disabled = true;
+  element('status').textContent = '';
+  try {
+    await api('/admin/closures', { method: 'POST', body: JSON.stringify(body) }, epoch);
+    element('closure-reason').value = '';
+    closurePreview = null;
+    element('status').textContent = '资源已关闭，受影响的待签到预约已取消。';
+    await refresh(epoch);
+    button.disabled = true;
+  } catch (error) {
+    if (epoch === identityGeneration && !(error instanceof StaleResponse)) {
+      element('status').textContent = error.message;
+    }
+    button.disabled = !closurePreview;
+  }
+});
 const bootstrap = ++identityGeneration;
 refresh(bootstrap).catch(error => {
   if (bootstrap !== identityGeneration || error instanceof StaleResponse) return;

@@ -15,6 +15,7 @@ files = [
     "tests/test_attendance.py",
     "tests/test_admin.py",
     "tests/test_reservations.py",
+    "tests/phase3-browser.cjs",
     "docs/API-v1.md",
     "docs/RULES.md",
     "docs/PHASE3.md",
@@ -23,12 +24,14 @@ files = [
 suite = ET.parse(root / "evidence" / "phase3" / "pytest.xml").getroot()
 if suite.tag == "testsuites":
     suite = suite.find("testsuite")
-ui = json.loads((root / "evidence" / "phase3" / "ui-smoke.json").read_text(encoding="utf-8"))
+ui = json.loads(
+    (root / "evidence" / "phase3" / "browser" / "results.json").read_text(encoding="utf-8")
+)
 report = {
     "phase": "alpha-03",
     "generated_at": "2026-11-25T18:32:00+08:00",
     "baseline": "07e6d64",
-    "local_commits": 3,
+    "local_commits": 5,
     "environment": {
         "os": "Windows 11 10.0.26300",
         "python": "3.13.3",

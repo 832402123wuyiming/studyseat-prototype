@@ -2,7 +2,7 @@
   "phase": "alpha-03",
   "generated_at": "2026-11-25T18:32:00+08:00",
   "baseline": "07e6d64",
-  "local_commits": 3,
+  "local_commits": 5,
   "environment": {
     "os": "Windows 11 10.0.26300",
     "python": "3.13.3",
@@ -21,8 +21,8 @@
     "skipped": 0
   },
   "ui_smoke": {
-    "checks": 15,
-    "passed": 15,
+    "checks": 13,
+    "passed": 13,
     "page_errors": 0
   },
   "source_sha256": {
@@ -31,14 +31,15 @@
     "studyseat/api.py": "efb50dc2f2e957f3fcfcde749fd1ddecc13f8e875a9c56878bab9a37dd57bab1",
     "studyseat/reservations.py": "014a2dc0ab6c09ec736b8a5e8fcb85f6fd7e9fb5a562078d9919abf3163ef943",
     "studyseat/static/app.js": "c4b8a87170a6893d84377cd8f771f1f6c0741337eda42384baaf2daecd4263b6",
-    "studyseat/static/app.css": "741a52e2bc6af6262ab3d2585df260cd2bd0390cc19268aa061fa2158aa4d655",
+    "studyseat/static/app.css": "42ebd67f0bc8e2271556f72dbf2956e93495b1c6de6402968a7f2d8a1fa03724",
     "studyseat/templates/index.html": "5c9ec8189af791fa943dc9e6690238944ee51e6280c8a10b10b6435a23a505c2",
     "tests/test_attendance.py": "815c630084cd9fa48c6240159931dc89992e683a28f154dcedbd2994164c5995",
     "tests/test_admin.py": "a5f09422fcf30122fc4b98daacca88c317daf3928335ee0fe263e4df6b920f17",
     "tests/test_reservations.py": "683edc02c29589c71cef903a819fc49a63dd8006e415a7d49d2aac07fc59adbf",
+    "tests/phase3-browser.cjs": "99f2b98e4747cb737d4ae9821be710bea703faf34b16b379ac0305d698a56aa0",
     "docs/API-v1.md": "a518068997f6acd778002b5b645a817935c0f4392e14cf342fae5c77a4e5d90f",
     "docs/RULES.md": "e8e9342c41b6ae3fbf6c15caea79dc6620d089a08e70e998e6d7f265498e6452",
-    "docs/PHASE3.md": "6345cc4d04a774bfba873a5f6f94d8b9cb5c1233bbe14fa3c77f1398f42bf4a7",
-    "README.md": "08f78a2c3c75cb644634ac8c87294fd5d7d881c36bc829788efe033a1357f3e5"
+    "docs/PHASE3.md": "f910c7e61b0a378b3c57396034f516c8340e566d3593b216707062ba13ec3ded",
+    "README.md": "b76aca7505ccc0bb361f0857a90e4b6f28399ca08edc035cc821cecb325e6031"
   }
 }

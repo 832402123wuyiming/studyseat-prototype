@@ -66,9 +66,9 @@
 | --- | --- | --- |
 | `python -m pytest -q --junitxml=evidence/phase3/pytest.xml` | 110 passed，0 failed，0 skipped；含阶段一、二既有 89 项与本轮新增 21 项 | [输出](../evidence/phase3/pytest.txt)、[JUnit](../evidence/phase3/pytest.xml) |
 | `python -m ruff check .` | All checks passed | [lint](../evidence/phase3/ruff-check.txt) |
-| `python -m ruff format --check .` | 25 files already formatted | [format](../evidence/phase3/ruff-format.txt) |
-| `node --check studyseat/static/app.js` | exit 0 | [syntax](../evidence/phase3/js-syntax.txt) |
-| Playwright + Edge 页面冒烟 | 15 项检查通过，0 page errors；含学生暂离/返回、管理员阻止关闭、座位关闭、重开 | [结果](../evidence/phase3/ui-smoke.json)、[截图](../evidence/phase3/screenshots/) |
+| `python -m ruff format --check .` | 26 files already formatted | [format](../evidence/phase3/ruff-format.txt) |
+| `node --check studyseat/static/app.js`、`node --check tests/phase3-browser.cjs` | exit 0 | [syntax](../evidence/phase3/js-syntax.txt) |
+| Playwright + Edge 页面冒烟（根目录 `node alpha/tests/phase3-browser.cjs`，独立测试库） | 13 项检查通过，0 page errors；含学生暂离/返回、管理员阻止关闭、座位关闭、重开 | [结果](../evidence/phase3/browser/results.json)、[截图](../evidence/phase3/browser/screenshots/) |
 
 后端新增用例覆盖：签到窗口两端与超窗、重复签到、签到超时释放、暂离/返回截止、结束与自动完成、错误归属/角色/CSRF、规则版本与快照、规则校验、关闭预览只读、确认取消、阻断、过期/篡改/失效预览、座位范围、重开不恢复和重复重开。
 
@@ -78,7 +78,7 @@
 
 ## 范围、差异与剩余事项
 
-- 本轮只做本地提交，未推送、未合并、未部署。基线来自上游 `07e6d64`；工作副本包含三次本地提交（服务与测试、页面、文档与证据），哈希取决于应用到的仓库。推送后需在 GitHub 上补 PR 和非作者审查记录，并以实际提交链接为准。
+- 本轮只做本地提交，未推送、未合并、未部署。基线来自上游 `07e6d64`；工作副本包含多次本地提交（服务与测试、页面、文档与证据、悬停修复、浏览器用例），哈希取决于应用到的仓库。推送后需在 GitHub 上补 PR 和非作者审查记录，并以实际提交链接为准。
 - 关闭时存在使用中/暂离中预约即拒绝，是 RULES.md 中待团队确认的口径；若团队决定允许强制关闭，需要新增对使用中预约的处理规则、原因记录和测试。
 - 超时释放为请求触发的惰性迁移，不是定时任务；长时间无请求时，记录会在下一次读取或写入时才落为终态，但占用判断同样使用该迁移，不会把过期记录当作有效占用。
 - 未实现校园统一认证、真实通知、物理门禁、管理统计图表和公网部署；这些不在本轮 Alpha 范围。

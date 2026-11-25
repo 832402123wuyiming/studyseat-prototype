@@ -78,7 +78,7 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 ./.venv/Scripts/python.exe scripts/process_smoke.py
 ```
 
-阶段三记录使用 `python -m pytest -q --junitxml=evidence/phase3/pytest.xml`，完整后端结果为 110 passed、0 failed、0 skipped；Ruff、格式和 JS 语法检查通过，页面冒烟 15 项检查通过，证据见 [evidence/phase3](evidence/phase3/)。
+阶段三记录使用 `python -m pytest -q --junitxml=evidence/phase3/pytest.xml`，完整后端结果为 110 passed、0 failed、0 skipped；Ruff、格式和 JS 语法检查通过，页面冒烟 13 项检查通过，证据见 [evidence/phase3](evidence/phase3/)。阶段三浏览器用例：在仓库根目录安装 Playwright 依赖，使用独立测试库启动服务，设置 `STUDYSEAT_TEST_URL`（默认 `http://127.0.0.1:5057`）和可选的 `STUDYSEAT_EVIDENCE_DIR`，从根目录运行 `node alpha/tests/phase3-browser.cjs`。
 
 `process_smoke.py` 使用临时数据库、随机端口和两个真实子进程；验证预约、文本和会话跨进程恢复、重登恢复、创建重放、重复取消、B 预约释放时段与唯一审计。
 
@@ -105,7 +105,7 @@ python scripts/verify_phase2.py
 
 当前为本地开发与课程验收服务。签到、暂离、返回、结束、超时释放、管理员规则写入和资源关闭已实现；校园统一认证、真实通知、物理门禁和生产部署不在本轮范围。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。
 
-任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2、阶段二 PR #3 已合并；阶段三在本地基线 `07e6d64` 上完成三次提交（服务与测试、页面、文档与证据），尚未推送、合并或部署，提交哈希以实际推送结果为准。非作者审查与正式验收待团队完成。
+任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2、阶段二 PR #3 已合并；阶段三在本地基线 `07e6d64` 上完成多次提交（服务与测试、页面、文档与证据、悬停修复、浏览器用例），尚未推送、合并或部署，提交哈希以实际推送结果为准。非作者审查与正式验收待团队完成。
 
 P2 独立审查修复了初始化期间编辑查询条件导致房间列表永久为空的问题。工作台加载期间查询控件禁用，失败时可点击“重新加载工作台”；条件编辑仅使旧余量查询失效。新增 `alpha/tests/initialization-browser.cjs` 已接入完整验证。复核时通过 `STUDYSEAT_EVIDENCE_DIR` 指定新证据目录，保留历史结果。缺陷与本轮证据见 [阶段二复核记录](docs/PHASE2.md#p2-独立审查前端初始化修复)。
 

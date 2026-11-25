@@ -1,4 +1,5 @@
 {
+  "target": "http://127.0.0.1:5059",
   "checks": [
     {
       "name": "student dashboard",
@@ -6,7 +7,7 @@
       "detail": ""
     },
     {
-      "name": "in-use reservation visible",
+      "name": "attendance actions visible",
       "passed": true,
       "detail": ""
     },
@@ -31,22 +32,17 @@
       "detail": ""
     },
     {
-      "name": "rule form populated",
+      "name": "in-use closure blocked",
       "passed": true,
       "detail": ""
     },
     {
-      "name": "blocked preview",
+      "name": "apply disabled while blocked",
       "passed": true,
       "detail": ""
     },
     {
-      "name": "apply disabled while in use",
-      "passed": true,
-      "detail": ""
-    },
-    {
-      "name": "seat preview ready",
+      "name": "closure preview ready",
       "passed": true,
       "detail": ""
     },
@@ -56,25 +52,21 @@
       "detail": ""
     },
     {
-      "name": "closure row",
+      "name": "apply stays disabled",
       "passed": true,
       "detail": ""
-    },
-    {
-      "name": "reopen status text",
-      "passed": true,
-      "detail": "资源已重新开放，已取消的预约不会恢复。"
     },
     {
       "name": "reopen",
       "passed": true,
-      "detail": "资源已重新开放，已取消的预约不会恢复。"
+      "detail": ""
     },
     {
-      "name": "page errors",
+      "name": "no page errors",
       "passed": true,
       "detail": ""
     }
   ],
-  "pageErrors": []
+  "pageErrors": [],
+  "passed": 13
 }

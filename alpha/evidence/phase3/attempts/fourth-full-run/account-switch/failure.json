@@ -1,0 +1,5 @@
+{
+  "result": "failed",
+  "passed": [],
+  "message": "page.waitForFunction: Timeout 30000ms exceeded."
+}

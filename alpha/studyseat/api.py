@@ -2,7 +2,7 @@ import uuid
 
 from flask import Blueprint, g, jsonify, render_template, request
 
-from . import reservations
+from . import lifecycle, management, reservations
 from .auth import ApiError, activate_session, authenticate, check_csrf, new_session, require_role
 from .db import get_db, utc_now, write_transaction
 
@@ -39,10 +39,10 @@ def index():
 def health():
     connection = get_db()
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    recorded = connection.execute("SELECT version FROM schema_versions WHERE version=1").fetchone()
-    if version != 1 or recorded is None:
+    recorded = connection.execute("SELECT version FROM schema_versions WHERE version=2").fetchone()
+    if version != 2 or recorded is None:
         raise ApiError(503, "DATABASE_UNAVAILABLE", "数据库版本未就绪，请检查初始化。")
-    return ok({"status": "ok", "schema_version": 1, "server_time": utc_now()})
+    return ok({"status": "ok", "schema_version": 2, "server_time": utc_now()})
 
 
 @bp.get("/api/v1/auth/session")
@@ -192,6 +192,8 @@ def my_reservations():
 @bp.get("/api/v1/reservations/<reservation_id>")
 @require_role("student")
 def my_reservation(reservation_id):
+    reservations.owned(get_db(), g.identity["id"], reservation_id)
+    lifecycle.sweep()
     return ok(reservations.owned(get_db(), g.identity["id"], reservation_id))
 
 
@@ -217,3 +219,75 @@ def create_reservation():
 def cancel_reservation(reservation_id):
     check_csrf()
     return ok(reservations.cancel(g.identity["id"], reservation_id))
+
+
+def operation_key(body):
+    key = body.get("idempotency_key")
+    if not valid_text(key, 100):
+        raise ApiError(400, "INVALID_INPUT", "请提交 1—100 字符的幂等操作键。")
+    return key
+
+
+@bp.post("/api/v1/reservations/<reservation_id>/<action>")
+@require_role("student")
+def reservation_action(reservation_id, action):
+    check_csrf()
+    if action not in ("check-in", "leave", "return", "finish"):
+        raise ApiError(404, "NOT_FOUND", "操作不存在。")
+    body = json_body()
+    return ok(lifecycle.transition(g.identity["id"], reservation_id, action, operation_key(body)))
+
+
+@bp.get("/api/v1/admin/reservations")
+@require_role("admin")
+def admin_reservations():
+    return ok(management.list_reservations())
+
+
+@bp.get("/api/v1/admin/resources")
+@require_role("admin")
+def admin_resources():
+    return ok(management.resources())
+
+
+@bp.post("/api/v1/admin/rules")
+@require_role("admin")
+def admin_rules():
+    check_csrf()
+    body = json_body()
+    return ok(
+        management.save_rules(
+            g.identity["id"], body.get("settings"), body.get("base_version"), operation_key(body)
+        )
+    )
+
+
+@bp.post("/api/v1/admin/closures/preview")
+@require_role("admin")
+def closure_preview():
+    check_csrf()
+    return ok(management.preview(g.identity["id"], json_body()))
+
+
+@bp.post("/api/v1/admin/closures")
+@require_role("admin")
+def create_closure():
+    check_csrf()
+    body = json_body()
+    return ok(management.close(g.identity["id"], body, operation_key(body)))
+
+
+@bp.post("/api/v1/admin/closures/<closure_id>/reopen")
+@require_role("admin")
+def reopen_closure(closure_id):
+    check_csrf()
+    body = json_body()
+    return ok(management.reopen(g.identity["id"], closure_id, operation_key(body)))
+
+
+@bp.post("/api/v1/admin/rooms/<room_id>/hours")
+@require_role("admin")
+def admin_room_hours(room_id):
+    check_csrf()
+    body = json_body()
+    return ok(management.save_hours(g.identity["id"], room_id, body, operation_key(body)))

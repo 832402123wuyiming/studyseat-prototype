@@ -41,13 +41,25 @@ def initialize():
     connection = get_db()
     connection.execute("PRAGMA journal_mode = WAL")
     version = connection.execute("PRAGMA user_version").fetchone()[0]
-    if version not in (0, 1):
+    if version not in (0, 1, 2):
         raise RuntimeError("Unsupported database schema version")
     schema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
     try:
         connection.executescript("BEGIN IMMEDIATE;\n" + schema)
+        # Another initializer may have upgraded while this process waited for its lock.
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (0, 1, 2):
+            raise RuntimeError("Unsupported database schema version")
         connection.execute("INSERT OR IGNORE INTO schema_versions VALUES (1, ?)", (utc_now(),))
-        connection.execute("PRAGMA user_version = 1")
+        if version < 2:
+            migration = Path(__file__).with_name("migrations") / "002_phase3.sql"
+            # executescript implicitly commits; execute individual SQL statements
+            # so v1 bootstrap and v2 upgrade share the same rollback boundary.
+            for statement in migration.read_text(encoding="utf-8").split(";"):
+                if statement.strip():
+                    connection.execute(statement)
+            connection.execute("INSERT INTO schema_versions VALUES (2, ?)", (utc_now(),))
+        connection.execute("PRAGMA user_version = 2")
         connection.commit()
     except Exception:
         connection.rollback()

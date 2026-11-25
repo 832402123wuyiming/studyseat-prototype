@@ -1,0 +1,5 @@
+{
+  "result": "failed",
+  "executed_at": "2026-11-25T12:51:29.834338+00:00",
+  "error": "Command '['/Users/zhouyiheng/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node', '/private/tmp/studyseat-phase3-build/alpha/tests/reservations-browser.cjs']' returned non-zero exit status 1."
+}

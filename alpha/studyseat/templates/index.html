@@ -8,20 +8,20 @@
   <script defer src="/static/app.js"></script>
 </head>
 <body>
-  <header><a href="/" class="brand"><span class="brand-icon">S</span> Study Seat <small>知行有座</small></a><span class="badge">ALPHA · 02</span></header>
+  <header><a href="/" class="brand"><span class="brand-icon">S</span> Study Seat <small>知行有座</small></a><span class="badge">ALPHA · 03</span></header>
   <main>
     <section class="intro"><p class="eyebrow">给专注留一个位置</p><h1>每一次出发，<br>都有座可期。</h1><p>连接校园自习空间，让学习从容开始。</p><div class="illustration" aria-hidden="true"><div class="window">✦</div><div class="books"></div><div class="desk"></div><div class="chair"></div></div><div class="milestones"><span>01 账号与数据基础</span><span>02 预约与冲突控制</span><span>03 使用与管理联动</span></div></section>
     <section class="panel">
       <div id="loading">正在连接服务…</div>
       <div id="login-view" hidden>
-        <p class="eyebrow">欢迎回来</p><h2>登录 Study Seat</h2><p class="muted">使用公开测试账号体验预约阶段版本</p>
+        <p class="eyebrow">欢迎回来</p><h2>登录 Study Seat</h2><p class="muted">使用公开测试账号体验使用与管理阶段版本</p>
         <form id="login-form">
           <label for="username">账号</label><input id="username" name="username" autocomplete="username" required maxlength="100" placeholder="请输入学生或管理员账号">
           <label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="请输入密码">
           <button type="submit">登录</button>
         </form>
         <details><summary>查看公开测试账号</summary><p>学生 A：832402116 / 123456<br>学生 B：student02 / Study1234<br>管理员：admin01 / Admin1234</p></details>
-        <p class="notice">已接入真实预约、取消与持久化。签到、暂离和管理写操作将在后续阶段开放。</p>
+        <p class="notice">已接入真实预约、签到、暂离、返回、结束和管理操作。页面签到仅记录操作，不能证明本人到场。</p>
       </div>
       <div id="dashboard" hidden>
         <div class="row"><p class="eyebrow">账号工作台</p><button id="logout" class="secondary">退出登录</button></div>
@@ -40,17 +40,48 @@
           <p id="availability" role="status">请先查询。</p>
           <form id="booking-form" hidden><label for="seat-id">可预约座位</label><select id="seat-id" required></select><button type="submit">创建预约</button></form>
           <div class="row"><h3>我的预约</h3><button id="reload-reservations" class="secondary">刷新预约</button></div>
-          <p class="muted">仅待签到预约可取消。取消后释放对应时段；预约与取消结果保存在服务端。</p>
+          <p class="muted">签到窗口及暂离截止按预约创建时的规则执行。截止时刻允许操作；最终以服务端时间和状态为准。</p>
           <ul id="reservations"></ul>
         </section>
         <h3>数据持久化验证</h3><p class="muted">保存一条文本后刷新，或重启服务再登录查看。这些是验证记录，不是预约。</p>
         <form id="note-form"><label for="note">验证文本</label><input id="note" maxlength="200" required placeholder="例如：第一次运行验证"><button type="submit">保存到数据库</button></form>
         <ul id="notes"></ul>
-        <div id="admin" hidden><h3>管理操作记录</h3><p class="muted">与学生端共用同一数据库，显示最近 100 条事件。</p><ul id="events"></ul></div>
+        <section id="admin" hidden>
+          <div class="row"><h3>管理工作台</h3><button id="reload-admin" class="secondary">刷新管理数据</button></div>
+          <p class="muted">与学生端共享预约、资源和规则。关闭立即生效，持续到重新开放；通知仅保留站内操作记录。</p>
+          <fieldset id="admin-fields" disabled>
+            <h3>预约记录</h3><ul id="admin-reservations"></ul>
+            <h3>规则配置</h3><p id="rule-version"></p>
+            <form id="rules-form">
+              <label for="rule-duration">单次最长（分钟，1—1440）</label><input id="rule-duration" type="number" min="1" max="1440" required>
+              <label for="rule-advance">提前天数（1—30）</label><input id="rule-advance" type="number" min="1" max="30" required>
+              <label for="rule-early">签到提前（分钟，0—240）</label><input id="rule-early" type="number" min="0" max="240" required>
+              <label for="rule-late">签到延后（分钟，0—240）</label><input id="rule-late" type="number" min="0" max="240" required>
+              <label for="rule-leave">暂离上限（分钟，1—240）</label><input id="rule-leave" type="number" min="1" max="240" required>
+              <button type="submit">保存新规则版本</button><button id="discard-rules" class="secondary" type="button">放弃修改并重载规则</button>
+            </form>
+            <h3>每日开放时间</h3><form id="hours-form">
+              <label for="hours-room">房间</label><select id="hours-room" required></select>
+              <label for="hours-open">开始时间（北京时间）</label><input id="hours-open" type="time" step="60" required>
+              <label for="hours-close">结束时间（北京时间，可填 24:00）</label><input id="hours-close" type="text" pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]|24:00" placeholder="22:00" required>
+              <button type="submit">保存开放时间</button>
+            </form>
+            <h3>关闭资源</h3><form id="closure-form">
+              <label for="closure-room">房间</label><select id="closure-room" required></select>
+              <label for="closure-scope">范围</label><select id="closure-scope"><option value="seat">单个座位</option><option value="room">整间房间</option></select>
+              <label for="closure-seat">座位</label><select id="closure-seat" required></select>
+              <label for="closure-reason">关闭原因</label><input id="closure-reason" required maxlength="200" placeholder="例如：设备检修">
+              <button type="submit">预览关闭影响</button>
+            </form>
+            <div id="closure-preview" role="status"></div><button id="confirm-closure" hidden>确认关闭并取消受影响预约</button>
+            <h3>关闭与重新开放</h3><ul id="closures"></ul>
+            <h3>管理操作记录</h3><p class="muted">最近 100 条事件，含执行者、预约编号、时间及原因；不代表消息已送达。</p><ul id="events"></ul>
+          </fieldset>
+        </section>
       </div>
       <p id="status" role="status" aria-live="polite"></p>
     </section>
   </main>
-  <footer><span>Study Seat · 智慧校园自习室</span><span>11 月 23—24 日阶段 · 预约与冲突控制</span></footer>
+  <footer><span>Study Seat · 智慧校园自习室</span><span>11 月 25—26 日阶段 · 使用与管理联动</span></footer>
 </body>
 </html>

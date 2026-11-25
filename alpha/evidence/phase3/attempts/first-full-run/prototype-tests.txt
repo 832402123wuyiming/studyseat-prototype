@@ -1,0 +1,98 @@
+✔ 规则版本更新不改写已创建预约，重复保存没有副作用 (2.996459ms)
+✔ 非法规则整批拒绝，未改变其他字段与版本 (1.772625ms)
+✔ 开放安排冲突时不部分保存，其他星期和记录不变 (1.895375ms)
+✔ 区间两端相邻不受影响，空影响允许关闭 (0.533834ms)
+✔ 预览没有修改数据，单座关闭仅影响对应待签到预约并生成可追溯记录 (0.994375ms)
+✔ 整间关闭过滤终态，使用中和暂离中阻断且无副作用 (0.21675ms)
+✔ 确认时重新核对状态，不沿用旧预览 (0.163833ms)
+✔ 重新开放不恢复取消预约，不移除其他关闭，重复开放不重复留痕 (0.203083ms)
+✔ 组合筛选日期包含边界，关键词与状态共同作用，错误范围提示 (20.079583ms)
+✔ 重置恢复管理端全量初始场景，四个资源座位编号数量正确 (0.360209ms)
+✔ T08 range: today and +7 inclusive; +8 rejected, Shanghai day and labels (47.827417ms)
+✔ T08 duration, past, malformed time, opening hours and seat ownership (2.199125ms)
+✔ T10–T11 multiple reservations, daily creation code, idempotent token and event (3.176083ms)
+✔ T12–T13 other student seat conflict, privacy, self conflict, adjacency and room-scoped seat IDs (3.458458ms)
+✔ T15 independent check-in boundary 13:49:59 (1.113792ms)
+✔ T15 independent check-in boundary 13:50:00 (1.109916ms)
+✔ T15 independent check-in boundary 14:15:00 (1.088459ms)
+✔ T15 independent check-in boundary 14:15:01 (1.479708ms)
+✔ T16 check-in survives reload, repeated request preserves first time and event (1.412166ms)
+✔ T17–T18 leave survives reload; repeated leave preserves origin and deadline (2.652375ms)
+✔ T18 beyond leave deadline refuses return and releases seat (2.360125ms)
+✔ T19 complete while away is durable and accounts for leave in duration (2.099125ms)
+✔ T20–T21 late reopening chronology 14:00:00 (1.950125ms)
+✔ T20–T21 late reopening chronology 15:50:00 (2.051458ms)
+✔ T20–T21 late reopening chronology 15:30:00 (1.914125ms)
+✔ T20 natural end at endpoint for in-use and no background page required (1.396833ms)
+✔ T22 pending opened after reservation end stays no-show expired (1.354541ms)
+✔ T23 terminal repeated operations preserve state, time and event: CANCEL (1.866834ms)
+✔ T23 terminal repeated operations preserve state, time and event: COMPLETE (2.126917ms)
+✔ T23 terminal repeated operations preserve state, time and event: EXPIRE (2.591542ms)
+✔ T24 operation on one reservation leaves the other untouched (2.04075ms)
+✔ T25 released future can be booked; past cannot: cancel (2.109417ms)
+✔ T25 released future can be booked; past cannot: complete (2.633042ms)
+✔ T25 released future can be booked; past cannot: expire (2.835833ms)
+✔ T26 full rule snapshot governs old reservation; new version governs new reservation (2.570875ms)
+✔ T02 login requires correct role, fifth failure locks for ten minutes across reload (2.969334ms)
+✔ T03–T04 ownership, sessions, draft isolation and logout preserves records (1.762ms)
+✔ T05 write failure does not create reservation or false operation success (1.615625ms)
+✔ T05 damaged JSON, missing fields and unknown versions are retained for explicit recovery (1.072708ms)
+✔ T05 storage failure while reconciling refuses further mutation (1.603ms)
+✔ T30 reset only project keys, demo clock persists and returning time does not resurrect terminal (2.298875ms)
+✔ M01 legacy migration is explicit read-only, once only, no fabricated year (1.447917ms)
+✔ T14 full room availability recovers when query changes and cancellation stays empty (1.87425ms)
+✔ M01 schema-invalid values never silently initialize over existing data (1.686917ms)
+✔ T16/T23 repeated check-in during leave cannot cancel leave or resurrect a terminal (2.5835ms)
+✔ T11 closing receipt and retrying a successful old draft does not duplicate after cancellation (1.435792ms)
+✔ Original student login uses the original public credentials and rejects the replaced password (1.247791ms)
+✔ Changing public credentials preserves old session, draft, reservation and attendance ownership (2.909667ms)
+✔ Original public username retains the existing student account lock across reload (1.443291ms)
+✔ Generated runtime includes the five original student views and independent admin MVP (19.927334ms)
+✔ Every generated first-party script, bootstrap and page script parses (37.628958ms)
+✔ Build sources are portable and the release retains authenticated navigation guards (0.5685ms)
+✔ T29 local assets and page links resolve under a nested deployment directory (3.484625ms)
+✔ T31 deliverable documentation and deployment contain no obsolete rules or false official claims (2.203166ms)
+✔ Delivery documents link to existing local instructions, evidence and screenshots (1.748958ms)
+✔ Formal entry resource URLs match current hashes and the release manifest (8.3675ms)
+✔ Every legacy public page resolves to the same formal entry and current release (0.445792ms)
+✔ Current documentation replaces retired Modao guides and accurately describes the formal component (5.920959ms)
+✖ GitHub export is self-contained, matches source hashes, excludes unrelated files and refuses overwrite (510.767375ms)
+✔ Alpha export allowlist excludes runtime and unrelated data (56.86075ms)
+✔ Original homepage keeps hero, four illustrated room cards, category tiles and icon navigation (1.241875ms)
+✔ Original room illustration, six-column seat map and fixed checkout footer remain (1.214125ms)
+✔ Original confirmation ticket, progress steps, agreement and success sheet remain (0.535959ms)
+✔ Original booking card template and personal chart, favorites and badges remain (0.972541ms)
+✔ Shared additions do not replace original page shells with simplified navigation or hero components (1.81ms)
+✔ Original student icon navigation keeps the default find-seat route (0.508083ms)
+✔ 学生退出清除会话，重登后预约及原状态保留，学生B不可见A的记录 (10.794458ms)
+✔ 学生原有登录角色校验与五次锁定保留 (2.776791ms)
+✔ 退出不结束使用中预约 (4.97375ms)
+✔ 管理规则及关闭仅改变管理模块，不影响学生规则或预约 (3.0095ms)
+ℹ tests 70
+ℹ suites 0
+ℹ pass 69
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 663.377791
+
+✖ failing tests:
+
+test at tests/submission.test.cjs:11:1
+✖ GitHub export is self-contained, matches source hashes, excludes unrelated files and refuses overwrite (510.767375ms)
+  AssertionError [ERR_ASSERTION]: /var/folders/dd/2ghhrx5n76g3tswv7jqyky_c0000gn/T/studyseat-submission-DUEBP6/repository/alpha/docs/PHASE3.md: ../evidence/phase3/verification.json
+      at TestContext.<anonymous> (/private/tmp/studyseat-phase3-build/tests/submission.test.cjs:23:432)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

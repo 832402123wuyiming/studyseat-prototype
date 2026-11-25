@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from .auth import ApiError
 from .db import get_db, write_transaction
+from .policy import valid_settings
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 ACTIVE = "('PENDING_CHECKIN','IN_USE','ON_LEAVE')"
@@ -49,9 +50,8 @@ def rules(connection):
         raise ApiError(503, "NOT_INITIALIZED", "请先初始化规则。")
     try:
         settings = json.loads(row["settings_json"])
-        for key in ("max_duration_minutes", "max_advance_days"):
-            if type(settings[key]) is not int or settings[key] <= 0:
-                raise ValueError
+        if not valid_settings(settings):
+            raise ValueError
     except (ValueError, TypeError, KeyError):
         raise ApiError(503, "RULES_UNAVAILABLE", "当前规则配置无效，请联系管理员。") from None
     return row["id"], settings
@@ -132,6 +132,9 @@ def owned(connection, student_id, reservation_id):
 
 
 def list_owned(student_id):
+    from .lifecycle import sweep
+
+    sweep()
     return [
         serialize(row)
         for row in get_db().execute(
@@ -141,7 +144,10 @@ def list_owned(student_id):
 
 
 def available(student_id, room_id, start_at, end_at):
+    from .lifecycle import sweep
+
     start, end = interval(start_at, end_at)
+    sweep()
     connection = get_db()
     _, settings = rules(connection)
     room = room_resource(connection, room_id)
@@ -168,6 +174,9 @@ def create(student_id, seat_id, start_at, end_at, key):
     start, end = interval(start_at, end_at)
     start_text, end_text = utc_text(start), utc_text(end)
     with write_transaction() as connection:
+        from .lifecycle import reconcile
+
+        reconcile(connection, now_utc())
         prior = connection.execute(
             "SELECT * FROM reservations WHERE student_id=? AND idempotency_key=?", (student_id, key)
         ).fetchone()
@@ -222,16 +231,23 @@ def audit(connection, student_id, reservation_id, action, now):
 
 
 def cancel(student_id, reservation_id):
+    from .lifecycle import reconcile
+
     with write_transaction() as connection:
         record = owned(connection, student_id, reservation_id)
         if record["status"] == "CANCELLED":
             return record
         now = now_utc()
-        if record["status"] != "PENDING_CHECKIN":
-            raise ApiError(409, "STATE_NOT_ALLOWED", "仅可取消待签到预约。")
-        connection.execute(
-            "UPDATE reservations SET status='CANCELLED', ended_at=? WHERE id=?",
-            (utc_text(now), reservation_id),
-        )
-        audit(connection, student_id, reservation_id, "RESERVATION_CANCELLED", now)
-        return owned(connection, student_id, reservation_id)
+        reconcile(connection, now)
+        record = owned(connection, student_id, reservation_id)
+        allowed = record["status"] == "PENDING_CHECKIN"
+        if allowed:
+            connection.execute(
+                "UPDATE reservations SET status='CANCELLED', ended_at=? WHERE id=?",
+                (utc_text(now), reservation_id),
+            )
+            audit(connection, student_id, reservation_id, "RESERVATION_CANCELLED", now)
+            record = owned(connection, student_id, reservation_id)
+    if not allowed:
+        raise ApiError(409, "STATE_NOT_ALLOWED", "仅可取消待签到预约。")
+    return record

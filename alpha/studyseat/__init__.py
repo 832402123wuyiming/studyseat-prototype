@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 import click
@@ -42,6 +43,18 @@ def create_app(test_config=None):
 
             seed_demo()
         click.echo("Database initialized" + (" with demo data" if demo else ""))
+
+    @app.cli.command("expire-reservations")
+    @click.option("--watch", is_flag=True, help="Repeat until interrupted")
+    @click.option("--interval", default=30, type=click.IntRange(1, 3600))
+    def expire_reservations(watch, interval):
+        from .lifecycle import sweep
+
+        while True:
+            click.echo(f"Reconciled {len(sweep())} reservations")
+            if not watch:
+                break
+            time.sleep(interval)
 
     @app.before_request
     def identity():

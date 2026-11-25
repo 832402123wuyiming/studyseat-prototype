@@ -41,7 +41,7 @@ def test_health_requires_supported_schema(client, app, mutation):
         if mutation == "missing-version":
             connection.execute("DELETE FROM schema_versions")
         else:
-            connection.execute("PRAGMA user_version = 2")
+            connection.execute("PRAGMA user_version = 99")
     response = client.get("/api/v1/health")
     assert response.status_code == 503
     assert response.json["error"]["code"] == "DATABASE_UNAVAILABLE"

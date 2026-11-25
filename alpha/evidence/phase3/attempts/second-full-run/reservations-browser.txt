@@ -1,0 +1,10 @@
+locator.click: Error: strict mode violation: locator('#reservations button') resolved to 2 elements:
+    1) <button class="secondary">取消预约</button> aka getByRole('button', { name: '取消预约' })
+    2) <button class="secondary">签到（页面确认）</button> aka getByRole('button', { name: '签到（页面确认）' })
+
+Call log:
+[2m  - waiting for locator('#reservations button')[22m
+
+    at /private/tmp/studyseat-phase3-build/alpha/tests/reservations-browser.cjs:137:48 {
+  log: [ "  - waiting for locator('#reservations button')" ]
+}

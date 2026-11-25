@@ -1,0 +1,4 @@
+{
+  "result": "failed",
+  "reason": "Documentation export test found missing current-run verification.json before report publication; not counted as passed."
+}

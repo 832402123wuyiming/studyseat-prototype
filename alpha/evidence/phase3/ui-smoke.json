@@ -1,0 +1,80 @@
+{
+  "checks": [
+    {
+      "name": "student dashboard",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "in-use reservation visible",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "leave transition",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "return transition",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "pending actions",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "admin panel",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule form populated",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "blocked preview",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "apply disabled while in use",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "seat preview ready",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "closure applied",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "closure row",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "reopen status text",
+      "passed": true,
+      "detail": "资源已重新开放，已取消的预约不会恢复。"
+    },
+    {
+      "name": "reopen",
+      "passed": true,
+      "detail": "资源已重新开放，已取消的预约不会恢复。"
+    },
+    {
+      "name": "page errors",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "pageErrors": []
+}

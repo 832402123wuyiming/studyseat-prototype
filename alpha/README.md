@@ -1,10 +1,10 @@
-# StudySeat Alpha 预约阶段
+# StudySeat Alpha 使用与管理阶段
 
-阶段一基线为已合并 PR #2（f0fd0fc）；本轮完成 **2026 年 11 月 23—24 日**日期段的查询、预约、取消和并发控制，实际开发验证日期为 11 月 23 日。保留原型蓝白视觉与独立静态原型，不将原型模拟流程计作真实业务。
+阶段一基线为已合并 PR #2（`f0fd0fc`），阶段二在 PR #3 完成查询、预约、取消和并发控制；本轮完成 **2026 年 11 月 25—26 日**日期段的签到、暂离、返回、结束、超时释放、管理员规则版本与资源关闭，实际开发验证日期为 11 月 25 日。保留原型蓝白视觉与独立静态原型，不将原型模拟流程计作真实业务。
 
-已实现：Flask 同源首页与 API、SQLite 文件持久化、服务端会话、CSRF、角色和归属校验、资源与版本规则读取、学生按房间/时段查询、创建预约、本人列表/详情、取消与释放、同学生幂等键、关联审计及写事务并发控制。页面访问真实接口，刷新、重登与相同配置重启可恢复预约；阶段一的验证文本工具继续保留。
+已实现：Flask 同源首页与 API、SQLite 文件持久化、服务端会话、CSRF、角色和归属校验、资源与版本规则读取、学生按房间/时段查询、创建预约、本人列表/详情、取消与释放、签到/暂离/返回/结束、服务端惰性超时释放、管理员规则新版本、资源关闭预览/确认/重开、关闭与操作审计，以及创建/取消/状态操作的写事务。页面访问真实接口，刷新、重登与相同配置重启可恢复预约和状态；阶段一的验证文本工具继续保留。
 
-契约见 [API-v1.md](docs/API-v1.md)，规则见 [RULES.md](docs/RULES.md)，本轮结果、验收步骤与限制见 [PHASE2.md](docs/PHASE2.md)。
+契约见 [API-v1.md](docs/API-v1.md)，规则见 [RULES.md](docs/RULES.md)，阶段二结果见 [PHASE2.md](docs/PHASE2.md)，本轮结果、验收步骤与限制见 [PHASE3.md](docs/PHASE3.md)。
 
 ## Windows 启动
 
@@ -58,11 +58,13 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 
 1. 访问首页与 `/api/v1/health`，学生 A 登录，选择 A101、明日北京时间 09:00—10:00 查询并预约 A01。
 2. 刷新、退出重登，预约仍在；用同样数据库和密钥重启服务后仍可恢复。
-3. 学生 B 登录，本人列表没有 A 的预约，不能读取或取消 A 的记录，同座位重叠时段不能预约。
-4. A 取消，B 重新查询后能预约该座位原时段。管理员可查看同库的预约创建和取消审计。
-5. 使用后端并发用例复现两个独立连接的竞争；不以页面按钮禁用作为并发保障。
+3. 学生 B 登录，本人列表没有 A 的预约，不能读取、取消或操作 A 的记录，同座位重叠时段不能预约。
+4. A 在签到窗口内签到，随后暂离、返回并结束；重复操作不改变首次时间或重复审计。超过签到截止未签到的预约，刷新后显示已超时并释放座位。
+5. A 取消一条待签到预约，B 重新查询后能预约该座位原时段。管理员可查看同库的预约、状态与关闭审计。
+6. 管理员保存新规则版本，既有预约保留原快照；预览并关闭一个含待签到预约的座位，受影响预约取消；重开后不恢复，其他学生可重新预约。
+7. 使用后端用例复现独立连接竞争和状态迁移边界；不以页面按钮禁用作为并发保障。
 
-资源目录数量不表示任意时段余量，查询结果也需创建时事务内复核。所有页面时间按北京时间显示，API 和数据库统一 UTC `Z`。提前 7 天按北京时间日历日计算，包含第七日；仅待签到预约可取消。详见 [规则](docs/RULES.md)。
+资源目录数量不表示任意时段余量，查询结果也需创建时事务内复核。所有页面时间按北京时间显示，API 和数据库统一 UTC `Z`。提前 7 天按北京时间日历日计算，包含第七日；仅待签到预约可取消，状态操作以服务端时间与规则快照为准。详见 [规则](docs/RULES.md)。
 
 ## 自动化验证
 
@@ -75,6 +77,8 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 ./.venv/Scripts/python.exe -m ruff format --check .
 ./.venv/Scripts/python.exe scripts/process_smoke.py
 ```
+
+阶段三记录使用 `python -m pytest -q --junitxml=evidence/phase3/pytest.xml`，完整后端结果为 110 passed、0 failed、0 skipped；Ruff、格式和 JS 语法检查通过，页面冒烟 15 项检查通过，证据见 [evidence/phase3](evidence/phase3/)。
 
 `process_smoke.py` 使用临时数据库、随机端口和两个真实子进程；验证预约、文本和会话跨进程恢复、重登恢复、创建重放、重复取消、B 预约释放时段与唯一审计。
 
@@ -95,13 +99,13 @@ python scripts/verify_phase2.py
 
 账号切换失败与延迟响应的补充回归：在独立测试数据库启动服务，设置 `STUDYSEAT_TEST_URL` 后从仓库根目录运行 `node alpha/tests/account-switch.cjs`。默认 Edge，可用 `STUDYSEAT_BROWSER_CHANNEL` 选择实际安装的浏览器；结果保存到 `alpha/evidence/account-switch/`。原浏览器脚本和进程重启脚本支持 `STUDYSEAT_EVIDENCE_DIR` 将本轮结果另存，保留历史报告。修复与实际验证见 [账号切换复核报告](docs/ACCOUNT-SWITCH-REVIEW.md)。
 
-`studyseat/api.py` 处理 HTTP；`auth.py` 处理认证、会话和权限；`db.py` 管理每请求独立连接与统一写事务；`schema.sql` 定义 v1 数据结构；`seed.py` 管理公开初始化数据；`reservations.py` 集中处理时间、规则、冲突及预约事务。所有写入口使用 `BEGIN IMMEDIATE`，失败回滚，锁等待上限 5 秒，锁忙返回 503 和重试提示。数据库新增版本需新迁移，不能仅修改旧表声明。
+`studyseat/api.py` 处理 HTTP；`auth.py` 处理认证、会话和权限；`db.py` 管理每请求独立连接与统一写事务；`schema.sql` 定义 v1 数据结构；`seed.py` 管理公开初始化数据；`reservations.py` 集中处理时间、规则、冲突及预约事务；`attendance.py` 处理签到、暂离、返回、结束和惰性超时释放；`admin.py` 处理规则版本、关闭预览/确认/重开。所有写入口使用 `BEGIN IMMEDIATE`，失败回滚，锁等待上限 5 秒，锁忙返回 503 和重试提示。数据库新增版本需新迁移，不能仅修改旧表声明。
 
-接口契约见 [docs/API-v1.md](docs/API-v1.md)，规则口径见 [docs/RULES.md](docs/RULES.md)，阶段任务、实测和限制见 [docs/DAY1.md](docs/DAY1.md)。
+接口契约见 [docs/API-v1.md](docs/API-v1.md)，规则口径见 [docs/RULES.md](docs/RULES.md)，阶段任务、实测和限制见 [docs/PHASE3.md](docs/PHASE3.md)。
 
-当前为本地开发与课程验收服务。签到、暂离、超时任务、管理员规则写入和资源关闭尚未实现。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。
+当前为本地开发与课程验收服务。签到、暂离、返回、结束、超时释放、管理员规则写入和资源关闭已实现；校园统一认证、真实通知、物理门禁和生产部署不在本轮范围。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。
 
-任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2 已合并；本轮阶段二只做本地提交，未推送、合并或部署。非作者审查与正式验收待团队完成。
+任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2、阶段二 PR #3 已合并；阶段三在本地基线 `07e6d64` 上完成三次提交（服务与测试、页面、文档与证据），尚未推送、合并或部署，提交哈希以实际推送结果为准。非作者审查与正式验收待团队完成。
 
 P2 独立审查修复了初始化期间编辑查询条件导致房间列表永久为空的问题。工作台加载期间查询控件禁用，失败时可点击“重新加载工作台”；条件编辑仅使旧余量查询失效。新增 `alpha/tests/initialization-browser.cjs` 已接入完整验证。复核时通过 `STUDYSEAT_EVIDENCE_DIR` 指定新证据目录，保留历史结果。缺陷与本轮证据见 [阶段二复核记录](docs/PHASE2.md#p2-独立审查前端初始化修复)。
 

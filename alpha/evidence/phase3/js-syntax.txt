@@ -1,0 +1,1 @@
+﻿node --check studyseat/static/app.js`r`nexit 0

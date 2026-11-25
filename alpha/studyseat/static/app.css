@@ -23,6 +23,7 @@ button { border: none; background: #2866e9; color: white; border-radius: 10px; p
 button:hover { background: #1951c8; }
 button:disabled { opacity: .6; cursor: wait; }
 .secondary { background: #edf3ff; color: #2866e9; padding: 8px 12px; }
+.secondary:hover { background: #dbe8ff; color: #1951c8; }
 .notice { background: #f1f6ff; padding: 14px; border-radius: 10px; margin-top: 22px; }
 summary { cursor: pointer; }
 .row { display: flex; justify-content: space-between; align-items: center; }

@@ -78,7 +78,7 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 ./.venv/Scripts/python.exe scripts/process_smoke.py
 ```
 
-阶段三记录使用 `python -m pytest -q --junitxml=evidence/phase3/pytest.xml`，完整后端结果为 110 passed、0 failed、0 skipped；Ruff、格式和 JS 语法检查通过，页面冒烟 13 项检查通过，证据见 [evidence/phase3](evidence/phase3/)。阶段三浏览器用例：在仓库根目录安装 Playwright 依赖，使用独立测试库启动服务，设置 `STUDYSEAT_TEST_URL`（默认 `http://127.0.0.1:5057`）和可选的 `STUDYSEAT_EVIDENCE_DIR`，从根目录运行 `node alpha/tests/phase3-browser.cjs`。
+阶段三记录使用 `python -m pytest -q --junitxml=evidence/phase3/pytest.xml`，完整后端结果为 110 passed、0 failed、0 skipped；Ruff、格式和 JS 语法检查通过，页面冒烟 13 项检查通过，证据见 [evidence/phase3](evidence/phase3/)。阶段二既有结果已在本轮复跑：后端 89 项、双进程冒烟 12 项、五套浏览器用例 36 项均通过，兼容性摘要见 [compatibility.json](evidence/phase3/compatibility.json)。阶段三浏览器用例：在仓库根目录安装 Playwright 依赖，使用独立测试库启动服务，设置 `STUDYSEAT_TEST_URL`（默认 `http://127.0.0.1:5057`）和可选的 `STUDYSEAT_EVIDENCE_DIR`，从根目录运行 `node alpha/tests/phase3-browser.cjs`。
 
 `process_smoke.py` 使用临时数据库、随机端口和两个真实子进程；验证预约、文本和会话跨进程恢复、重登恢复、创建重放、重复取消、B 预约释放时段与唯一审计。
 

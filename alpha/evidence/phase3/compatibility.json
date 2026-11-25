@@ -1,0 +1,51 @@
+{
+  "checked_at": "2026-11-25T19:45:00+08:00",
+  "baseline": "07e6d64",
+  "patch_apply": {
+    "result": "passed",
+    "method": "git am --3way on a clean snapshot of 07e6d64"
+  },
+  "schema": {
+    "version": 1,
+    "migration": "none",
+    "note": "phase three uses columns already declared in phase two schema.sql"
+  },
+  "phase_two_database_upgrade": {
+    "result": "passed",
+    "checks": [
+      "existing phase-two session cookie accepted without re-login",
+      "existing reservation readable through GET /reservations",
+      "rule version and snapshot retained",
+      "check-in, leave, return and finish accepted on the old record",
+      "new audit actions written once each"
+    ],
+    "status_path": "PENDING_CHECKIN -> IN_USE -> ON_LEAVE -> IN_USE -> COMPLETED"
+  },
+  "phase_two_pytest": {
+    "passed": 89,
+    "failed": 0,
+    "note": "part of the current 110; one phase-two timeout expectation was intentionally updated to 409 + EXPIRED"
+  },
+  "phase_two_process_smoke": {
+    "result": "passed",
+    "checks": 12,
+    "note": "real two-process restart, session, reservation, idempotency and cancel release"
+  },
+  "phase_two_browser": {
+    "result": "passed",
+    "browser": "Microsoft Edge 158.0.4370.33",
+    "total": 36,
+    "suites": {
+      "browser": 11,
+      "reservations": 6,
+      "account_switch": 6,
+      "initialization": 6,
+      "reservation_list": 7
+    },
+    "note": "two selectors were updated to target the cancel button after a check-in button was added"
+  },
+  "intentional_behavior_changes": [
+    "cancelling a pending reservation after the check-in deadline now returns 409 and the record becomes EXPIRED",
+    "list, detail and availability reads now run the timeout sweep inside a write transaction"
+  ]
+}

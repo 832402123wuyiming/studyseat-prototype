@@ -2,7 +2,7 @@
   "phase": "alpha-03",
   "generated_at": "2026-11-25T18:32:00+08:00",
   "baseline": "07e6d64",
-  "local_commits": 5,
+  "local_commits": 7,
   "environment": {
     "os": "Windows 11 10.0.26300",
     "python": "3.13.3",
@@ -39,7 +39,7 @@
     "tests/phase3-browser.cjs": "99f2b98e4747cb737d4ae9821be710bea703faf34b16b379ac0305d698a56aa0",
     "docs/API-v1.md": "a518068997f6acd778002b5b645a817935c0f4392e14cf342fae5c77a4e5d90f",
     "docs/RULES.md": "e8e9342c41b6ae3fbf6c15caea79dc6620d089a08e70e998e6d7f265498e6452",
-    "docs/PHASE3.md": "f910c7e61b0a378b3c57396034f516c8340e566d3593b216707062ba13ec3ded",
-    "README.md": "b76aca7505ccc0bb361f0857a90e4b6f28399ca08edc035cc821cecb325e6031"
+    "docs/PHASE3.md": "1f6617bd68c9252382ca3efe1c79a6cdd951d2d88ca640a09306172a7cf5d3a3",
+    "README.md": "d2d31c36a629cf884b978b006f71361a74fc29e247967d9cd4824dfa06f02e3f"
   }
 }

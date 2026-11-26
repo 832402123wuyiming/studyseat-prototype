@@ -1,0 +1,8 @@
+{
+  "result": "failed",
+  "completed_checks": [
+    "real query/create; lost receipt retried with same key; refresh/relogin persistence; Beijing payload on Los Angeles device",
+    "desktop and 390px mobile layout without horizontal overflow"
+  ],
+  "error": "locator.click: Error: strict mode violation: locator('#reservations button') resolved to 2 elements:\n    1) <button class=\"secondary\">取消预约</button> aka getByRole('button', { name: '取消预约' })\n    2) <button class=\"secondary\">签到（页面确认）</button> aka getByRole('button', { name: '签到（页面确认）' })\n\nCall log:\n\u001b[2m  - waiting for locator('#reservations button')\u001b[22m\n\n    at /private/tmp/studyseat-phase3-build/alpha/tests/reservations-browser.cjs:137:48"
+}

@@ -1,0 +1,27 @@
+{
+  "result": "passed",
+  "source": "pytest.txt after successful assertions",
+  "checks": [
+    {
+      "race": "first-delayed-leave",
+      "response": 409,
+      "independent_connections": 2,
+      "status": "IN_USE"
+    },
+    {
+      "race": "first-delayed-return",
+      "response": 409,
+      "independent_connections": 2,
+      "status": "ON_LEAVE"
+    },
+    {
+      "watch_pid": 9670,
+      "same_process_recovered": true,
+      "output": [
+        "Database busy; retrying in 1s (attempt 1)",
+        "Reconciled 1 reservations",
+        "Reconciled 0 reservations"
+      ]
+    }
+  ]
+}

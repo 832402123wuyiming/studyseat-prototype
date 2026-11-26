@@ -1,0 +1,13 @@
+{
+  "result": "passed",
+  "executed_at": "2026-11-25T14:00:51.201Z",
+  "browser": "158.0.8127.37",
+  "channel": "chrome",
+  "checks": [
+    "real POST receipt delayed while new rule draft is edited",
+    "draft remains 45 and database remains 30 until explicit rule save",
+    "unsaved-exit confirmation remains active",
+    "draft saves as 45 via real admin API",
+    "no page errors"
+  ]
+}

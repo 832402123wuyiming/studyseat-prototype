@@ -1,0 +1,75 @@
+........................................................................ [ 42%]
+........................................................................ [ 85%]
+.........................                                                [100%]
+==================================== PASSES ====================================
+_______________________ test_busy_database_is_retryable ________________________
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: OperationalError
+_____ test_lifecycle_audit_failure_rolls_back[check-in-setup0-CHECKED_IN] ______
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+_______ test_lifecycle_audit_failure_rolls_back[leave-setup1-LEFT_SEAT] ________
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+_______ test_lifecycle_audit_failure_rolls_back[return-setup2-RETURNED] ________
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+_ test_lifecycle_audit_failure_rolls_back[finish-setup3-RESERVATION_FINISHED] __
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+_________________ test_closure_failure_rolls_back_all_records __________________
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+______________ test_independent_phase3_writers[duplicate-checkin] ______________
+----------------------------- Captured stdout call -----------------------------
+{"independent_connections": 2, "responses": [200, 200], "scenario": "duplicate-checkin", "write_transactions": 2}
+______________ test_independent_phase3_writers[duplicate-finish] _______________
+----------------------------- Captured stdout call -----------------------------
+{"independent_connections": 2, "responses": [200, 200], "scenario": "duplicate-finish", "write_transactions": 2}
+_______________ test_independent_phase3_writers[duplicate-close] _______________
+----------------------------- Captured stdout call -----------------------------
+{"independent_connections": 2, "responses": [200, 200], "scenario": "duplicate-close", "write_transactions": 2}
+______________ test_independent_phase3_writers[checkin-vs-close] _______________
+----------------------------- Captured stdout call -----------------------------
+{"independent_connections": 2, "responses": [409, 200], "scenario": "checkin-vs-close", "write_transactions": 2}
+______________ test_independent_phase3_writers[booking-vs-close] _______________
+----------------------------- Captured stdout call -----------------------------
+{"independent_connections": 2, "responses": [409, 200], "scenario": "booking-vs-close", "write_transactions": 2}
+______________ test_independent_phase3_writers[duplicate-timeout] ______________
+----------------------------- Captured stdout call -----------------------------
+{"independent_connections": 2, "responses": [0, 1], "scenario": "duplicate-timeout", "write_transactions": 2}
+_________ test_first_delayed_command_cannot_change_later_cycle[leave] __________
+----------------------------- Captured stdout call -----------------------------
+{"race": "first-delayed-leave", "response": 409, "independent_connections": 3, "status": "IN_USE"}
+_________ test_first_delayed_command_cannot_change_later_cycle[return] _________
+----------------------------- Captured stdout call -----------------------------
+{"race": "first-delayed-return", "response": 409, "independent_connections": 2, "status": "ON_LEAVE"}
+_________ test_watch_recovers_after_real_busy_timeout_without_restart __________
+----------------------------- Captured stdout call -----------------------------
+{"watch_pid": 9343, "same_process_recovered": true, "output": ["Database busy; retrying in 1s (attempt 1)", "Reconciled 1 reservations", "Reconciled 0 reservations"]}
+______ test_audit_failure_rolls_back_entire_mutation[RESERVATION_CREATED] ______
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+_____ test_audit_failure_rolls_back_entire_mutation[RESERVATION_CANCELLED] _____
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+__________ test_independent_connections_compete_atomically[same-seat] __________
+----------------------------- Captured stdout call -----------------------------
+{"begin_immediate_count": 2, "cancel_audit_count": 0, "create_audit_count": 1, "independent_connections": 2, "reservation_count": 1, "responses": [201, 409], "scenario": "same-seat"}
+________ test_independent_connections_compete_atomically[same-student] _________
+----------------------------- Captured stdout call -----------------------------
+{"begin_immediate_count": 2, "cancel_audit_count": 0, "create_audit_count": 1, "independent_connections": 2, "reservation_count": 1, "responses": [201, 409], "scenario": "same-student"}
+__________ test_independent_connections_compete_atomically[same-key] ___________
+----------------------------- Captured stdout call -----------------------------
+{"begin_immediate_count": 2, "cancel_audit_count": 0, "create_audit_count": 1, "independent_connections": 2, "reservation_count": 1, "responses": [200, 201], "scenario": "same-key"}
+____ test_independent_connections_compete_atomically[different-payload-key] ____
+----------------------------- Captured stdout call -----------------------------
+{"begin_immediate_count": 2, "cancel_audit_count": 0, "create_audit_count": 1, "independent_connections": 2, "reservation_count": 1, "responses": [201, 409], "scenario": "different-payload-key"}
+_________ test_independent_connections_compete_atomically[same-cancel] _________
+----------------------------- Captured stdout call -----------------------------
+{"begin_immediate_count": 2, "cancel_audit_count": 1, "create_audit_count": 1, "independent_connections": 2, "reservation_count": 1, "responses": [200, 200], "scenario": "same-cancel"}
+___________ test_failed_login_transaction_preserves_original_session ___________
+------------------------------ Captured log call -------------------------------
+ERROR    studyseat:__init__.py:93 Database operation failed: IntegrityError
+- generated xml file: /Users/zhouyiheng/Desktop/软件工程/studyseat-phase3/alpha/evidence/phase3-review/pytest-focused-all.xml -
+169 passed in 71.23s (0:01:11)

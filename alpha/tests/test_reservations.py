@@ -267,19 +267,25 @@ def test_cancel_rejects_other_states(app, client, status):
     headers = student(client)
     record = post(client, headers).json["data"]
     with app.app_context(), write_transaction() as db:
-        db.execute("UPDATE reservations SET status=? WHERE id=?", (status, record["id"]))
+        db.execute(
+            "UPDATE reservations SET status=?,leave_deadline='2026-11-24T00:30:00.000000Z' WHERE id=?",
+            (status, record["id"]),
+        )
     assert client.post(BASE + "/" + record["id"] + "/cancel", headers=headers).status_code == 409
     assert count(app, "audit_events", "action='RESERVATION_CANCELLED'") == 0
 
 
 @pytest.mark.parametrize("days,minutes", [(1, 0), (1, 15), (2, 0)])
-def test_pending_cancel_at_and_after_start(client, monkeypatch, days, minutes):
+def test_pending_cancel_reconciles_deadlines(client, monkeypatch, days, minutes):
     headers = student(client)
     record = post(client, headers).json["data"]
     monkeypatch.setattr(
         reservations, "now_utc", lambda: NOW + timedelta(days=days, minutes=minutes)
     )
-    assert client.post(BASE + "/" + record["id"] + "/cancel", headers=headers).status_code == 200
+    response = client.post(BASE + "/" + record["id"] + "/cancel", headers=headers)
+    assert response.status_code == (409 if days == 2 else 200)
+    if days == 2:
+        assert client.get(BASE + "/" + record["id"]).json["data"]["status"] == "EXPIRED"
 
 
 def test_rule_snapshot_and_latest_rule(app, client):
@@ -438,7 +444,10 @@ def test_only_active_states_block_seat(app, client, status):
     headers = student(client)
     post(client, headers)
     with app.app_context(), write_transaction() as db:
-        db.execute("UPDATE reservations SET status=?", (status,))
+        db.execute(
+            "UPDATE reservations SET status=?,leave_deadline='2026-11-24T00:30:00.000000Z'",
+            (status,),
+        )
     other = app.test_client()
     other_headers = student(other, "student02", "Study1234")
     expected = 409 if status in ("PENDING_CHECKIN", "IN_USE", "ON_LEAVE") else 201

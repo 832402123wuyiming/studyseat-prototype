@@ -1,6 +1,8 @@
 # StudySeat Alpha 第四阶段交付
 
-本候选版本基于第三阶段 PR #4 的提交 `60f40e1089d6fd1da6125c19d897331019c9b775`，实际验证日期为 2026 年 11 月 27 日。它是独立的 Alpha 应用源码快照，不包含 deploy、prototype、modao 等历史原型目录。第三阶段 PR 仍打开；本地候选版本不代表团队已审查、主分支已合并或已公开部署。
+本候选版本基于第三阶段 PR #4 的提交 `60f40e1089d6fd1da6125c19d897331019c9b775`，实际验证日期为 2026 年 11 月 27 日。它是独立的 Alpha 应用源码快照，不包含 deploy、prototype、modao 等历史原型目录。第三阶段 PR 仍打开；第四阶段已上传并提交 PR，待团队审查；尚未合并或公开部署。
+
+第四阶段已通过 GitHub CLI 上传至 [832402123wuyiming/studyseat-prototype](https://github.com/832402123wuyiming/studyseat-prototype/tree/alpha-phase4-20261127) 的 `alpha-phase4-20261127` 分支，关联 [Issue #7](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/7) 与 [PR #8](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/8)。代码与实测证据提交为 [`9e5233d87df9`](https://github.com/832402123wuyiming/studyseat-prototype/commit/9e5233d87df975f36c9c029a818ec0b9f27ef4a5)。当前 PR 待审查，未合并或部署。
 
 ## 启动和复跑
 

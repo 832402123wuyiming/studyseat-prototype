@@ -1,5 +1,9 @@
 # StudySeat Alpha 第四阶段候选版本
 
+第四阶段已通过 GitHub CLI 上传至 [832402123wuyiming/studyseat-prototype](https://github.com/832402123wuyiming/studyseat-prototype/tree/alpha-phase4-20261127) 的 `alpha-phase4-20261127` 分支，关联 [Issue #7](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/7) 与 [PR #8](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/8)。代码与实测证据提交为 [`9e5233d87df9`](https://github.com/832402123wuyiming/studyseat-prototype/commit/9e5233d87df975f36c9c029a818ec0b9f27ef4a5)。当前 PR 待审查，未合并或部署。
+
+第四阶段博客见 [Word 文档](docs/StudySeat-Alpha-Phase4-Blog.docx)，阶段记录见 [PHASE4.md](docs/PHASE4.md)。
+
 本次交付基于第三阶段 PR #4 的 `60f40e1` 源码快照，实际验证日期为 2026 年 11 月 27 日。新增统一回归、真实 HTTP 实测、SQLite 一致备份与交付文档。完整入口为 `python scripts/verify_phase4.py`。本轮后端及交付检查合计 114 项通过，六套浏览器用例通过。后端先全量运行113项，修正日志编码后补验4项交付检查，汇总JUnit按唯一用例去重，原始报告保留。详情见 [第四阶段交付](docs/DELIVERY.md) 和 [本次证据](evidence/phase4/verification.json)。以下保留前序阶段的启动与业务说明，历史测试数字不作为本轮结果。
 
 阶段一基线为已合并 PR #2（`f0fd0fc`），阶段二在 PR #3 完成查询、预约、取消和并发控制；本轮完成 **2026 年 11 月 25—26 日**日期段的签到、暂离、返回、结束、超时释放、管理员规则版本与资源关闭，实际开发验证日期为 11 月 25 日。保留原型蓝白视觉与独立静态原型，不将原型模拟流程计作真实业务。

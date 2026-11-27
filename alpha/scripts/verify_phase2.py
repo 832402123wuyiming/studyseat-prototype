@@ -28,13 +28,16 @@ NODE = os.environ.get("STUDYSEAT_NODE", "node")
 
 
 def run(command, log, cwd=ROOT, env=None):
+    child_env = dict(os.environ)
+    if env is not None:
+        child_env.update(env)
+    child_env.update(PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
     result = subprocess.run(
         command,
         cwd=cwd,
-        env=env,
+        env=child_env,
         text=True,
         encoding="utf-8",
-        errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )

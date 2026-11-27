@@ -9,3 +9,5 @@
 当前验证证据在 [phase4-integration](../evidence/phase4-integration)，具体审查结论见 [合并前审查](PHASE4-MERGE-REVIEW.md)，运行见 [DELIVERY.md](DELIVERY.md)。
 
 原 [Word 博客](StudySeat-Alpha-Phase4-Blog.docx)记录初次候选的 114 项检查和六套浏览器结果；它是初始候选的历史快照。当前主线集成结果以本次审查记录为准。未把初始候选的测试结果套用于集成版本。
+
+该 Word 文件通过导出工具的指定文件白名单随 Alpha 资料导出；未放开其他 Word 文件。导出回归同时检查链接、文件内容和摘要、敏感文件排除与禁止覆盖。原型生成文件固定使用 UTF-8 和 LF，使 Windows 导出副本重建后的摘要保持一致。

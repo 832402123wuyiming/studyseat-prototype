@@ -8,6 +8,8 @@
 
 第四阶段验证入口：`python scripts/verify_phase4.py`。需要 requirements-dev.txt、Node、Playwright 与本机 Edge；通过 STUDYSEAT_BROWSER_CHANNEL 选择其他已安装浏览器。全部测试使用独立临时库，覆盖后端、七套浏览器、真实进程重启、v1 升级至 v3、独立超时任务和 HTTP 查询及竞争。新结果位于 evidence/phase4-integration。历史 evidence/phase4 是旧候选版本记录，不作为当前版本的通过证据。
 
+每次复验请通过 `STUDYSEAT_EVIDENCE_DIR` 指向一个新的目录。完整验证的性能 JSON、日志及其他结果写入同一轮目录；单独运行 `phase4_load.py` 也遵守该变量，未设置时才使用 `evidence/phase4-integration`。相对路径按执行目录解析。性能回归在隔离副本中执行真实负载，并检查默认历史报告和模拟日常数据库的摘要不变。
+
 ## 数据库备份和恢复
 
 在 alpha 目录执行 `python scripts/backup_db.py instance/studyseat.sqlite3 backups/before-demo.sqlite3`。脚本使用 SQLite backup API，包含已提交 WAL 数据并检查完整性，拒绝覆盖目标或创建缺失源库。

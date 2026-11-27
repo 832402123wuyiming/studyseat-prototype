@@ -1,5 +1,7 @@
 # StudySeat Alpha 第四阶段集成记录
 
+本轮针对 `71cabb9` 的独立审查问题修复见 [修复与完整复验记录](PHASE4-REVIEW-FIXES.md)，证据位于 `alpha/evidence/phase4-review-fixes/full/`。下文保留上一轮候选与主线集成上下文；本轮实际数量以新记录及原始报告为准。
+
 任务 [Issue #7](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/7)，合并请求 [PR #8](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/8)。
 
 初次候选基于第三阶段旧 PR #4，代码与证据提交 9e5233d，Word 博客及链接提交 6dbddb6。随后合并前检查发现，main 已通过 PR #6 合入另一版第三阶段及复查修复，故以 main 328a3b3 重新整理第四阶段。

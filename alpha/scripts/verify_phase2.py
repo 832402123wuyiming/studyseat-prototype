@@ -29,7 +29,14 @@ NODE = os.environ.get("STUDYSEAT_NODE", "node")
 
 def run(command, log, cwd=ROOT, env=None):
     result = subprocess.run(
-        command, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        command,
+        cwd=cwd,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
     (EVIDENCE / log).write_text(result.stdout, encoding="utf-8")
     print(f"{log}: exit {result.returncode}", flush=True)

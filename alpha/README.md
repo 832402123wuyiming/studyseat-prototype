@@ -1,4 +1,6 @@
-# StudySeat Alpha 使用与管理阶段
+# StudySeat Alpha 第四阶段候选版本
+
+本次交付基于第三阶段 PR #4 的 `60f40e1` 源码快照，实际验证日期为 2026 年 11 月 27 日。新增统一回归、真实 HTTP 实测、SQLite 一致备份与交付文档。完整入口为 `python scripts/verify_phase4.py`。本轮后端及交付检查合计 114 项通过，六套浏览器用例通过。后端先全量运行113项，修正日志编码后补验4项交付检查，汇总JUnit按唯一用例去重，原始报告保留。详情见 [第四阶段交付](docs/DELIVERY.md) 和 [本次证据](evidence/phase4/verification.json)。以下保留前序阶段的启动与业务说明，历史测试数字不作为本轮结果。
 
 阶段一基线为已合并 PR #2（`f0fd0fc`），阶段二在 PR #3 完成查询、预约、取消和并发控制；本轮完成 **2026 年 11 月 25—26 日**日期段的签到、暂离、返回、结束、超时释放、管理员规则版本与资源关闭，实际开发验证日期为 11 月 25 日。保留原型蓝白视觉与独立静态原型，不将原型模拟流程计作真实业务。
 
@@ -105,7 +107,7 @@ python scripts/verify_phase2.py
 
 当前为本地开发与课程验收服务。签到、暂离、返回、结束、超时释放、管理员规则写入和资源关闭已实现；校园统一认证、真实通知、物理门禁和生产部署不在本轮范围。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。
 
-任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2、阶段二 PR #3 已合并；阶段三在本地基线 `07e6d64` 上完成多次提交（服务与测试、页面、文档与证据、悬停修复、浏览器用例），尚未推送、合并或部署，提交哈希以实际推送结果为准。非作者审查与正式验收待团队完成。
+任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2、阶段二 PR #3 已合并；阶段三在本地基线 `07e6d64` 上完成多次提交（服务与测试、页面、文档与证据、悬停修复、浏览器用例），已发布到第三阶段 PR #4，当前仍打开，尚未合并或部署。非作者审查与正式验收待团队完成。
 
 P2 独立审查修复了初始化期间编辑查询条件导致房间列表永久为空的问题。工作台加载期间查询控件禁用，失败时可点击“重新加载工作台”；条件编辑仅使旧余量查询失效。新增 `alpha/tests/initialization-browser.cjs` 已接入完整验证。复核时通过 `STUDYSEAT_EVIDENCE_DIR` 指定新证据目录，保留历史结果。缺陷与本轮证据见 [阶段二复核记录](docs/PHASE2.md#p2-独立审查前端初始化修复)。
 

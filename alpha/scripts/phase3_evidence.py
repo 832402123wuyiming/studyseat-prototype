@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path

@@ -1,47 +1,19 @@
 # StudySeat Alpha 第四阶段交付
 
-本候选版本基于第三阶段 PR #4 的提交 `60f40e1089d6fd1da6125c19d897331019c9b775`，实际验证日期为 2026 年 11 月 27 日。它是独立的 Alpha 应用源码快照，不包含 deploy、prototype、modao 等历史原型目录。第三阶段 PR 仍打开；第四阶段已上传并提交 PR，待团队审查；尚未合并或公开部署。
+本版本基于已合并 PR #6 后的 main 328a3b3d9784d33832094610610498ae14d30935，保留 schema v3、状态版本校验、后台超时任务和管理幂等操作。不得使用旧 PR #4 的 schema v1 实现覆盖当前业务。
 
-第四阶段已通过 GitHub CLI 上传至 [832402123wuyiming/studyseat-prototype](https://github.com/832402123wuyiming/studyseat-prototype/tree/alpha-phase4-20261127) 的 `alpha-phase4-20261127` 分支，关联 [Issue #7](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/7) 与 [PR #8](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/8)。代码与实测证据提交为 [`9e5233d87df9`](https://github.com/832402123wuyiming/studyseat-prototype/commit/9e5233d87df975f36c9c029a818ec0b9f27ef4a5)。当前 PR 待审查，未合并或部署。
+## 启动和验证
 
-## 启动和复跑
+启动、v1 至 v3 升级和后台任务运行按 alpha/README.md 执行。升级前停止 HTTP 服务和超时进程，先备份数据库与稳定密钥。
 
-在 alpha 目录执行 README 的 Windows 启动步骤。首次安装需要网络；运行依赖和开发依赖分别锁定在 requirements.txt 与 requirements-dev.txt。完整验证需要 Node、Playwright 和本机 Edge，其他平台通过 STUDYSEAT_BROWSER_CHANNEL 选择已安装浏览器。
+第四阶段验证入口：`python scripts/verify_phase4.py`。需要 requirements-dev.txt、Node、Playwright 与本机 Edge；通过 STUDYSEAT_BROWSER_CHANNEL 选择其他已安装浏览器。全部测试使用独立临时库，覆盖后端、七套浏览器、真实进程重启、v1 升级至 v3、独立超时任务和 HTTP 查询及竞争。新结果位于 evidence/phase4-integration。历史 evidence/phase4 是旧候选版本记录，不作为当前版本的通过证据。
 
-```powershell
-./start.ps1 -Python 'C:/你的Python目录/python.exe'
-# 在同一环境安装开发依赖后
-python -m pip install -r requirements-dev.txt
-python scripts/verify_phase4.py
-```
+## 数据库备份和恢复
 
-六套浏览器用例各自建立空数据库并启动临时本机服务。进程重启用例使用两个真实进程；性能脚本使用临时 SQLite 文件、独立会话、线程 WSGI 服务和真实 HTTP。测试不会读取日常数据库。原型测试不属于本次验证范围。
+在 alpha 目录执行 `python scripts/backup_db.py instance/studyseat.sqlite3 backups/before-demo.sqlite3`。脚本使用 SQLite backup API，包含已提交 WAL 数据并检查完整性，拒绝覆盖目标或创建缺失源库。
 
-浏览器脚本依赖 Playwright 1.62.1，可在可写工具目录用 `npm install --prefix ./ui-tools playwright@1.62.1` 安装，再将其 node_modules 的绝对路径设为 NODE_PATH。仓库目录若已有依赖，沿用原配置即可。不要把 node_modules 打包交付。
+恢复时停止 HTTP 和超时任务，归档旧数据库及 WAL、SHM 文件，将备份复制到全新目录，以 STUDYSEAT_DATABASE 指向它，沿用密钥后按 README 初始化升级并启动。不得将旧 WAL 与恢复文件混用。备份与数据库具有同样的数据保护要求，不能提交日常数据库或密钥。
 
-Windows 临时目录过长时，在当前 PowerShell 中把 TEMP 和 TMP 设置为短的可写目录后重试。自动化需要访问 127.0.0.1；受限沙箱中的连接拒绝属于运行环境限制，不应计作业务失败。
+## 发布状态
 
-## 备份和恢复
-
-```powershell
-python scripts/backup_db.py instance/studyseat.sqlite3 backups/before-demo.sqlite3
-```
-
-备份通过 SQLite backup API 读取一致快照，包含已提交的 WAL 数据；目标已存在时拒绝覆盖，源不存在时拒绝创建空库。备份包含账号、会话与业务记录，应与正式数据库按相同权限保管。不要把日常数据库或密钥提交到 Git。
-
-恢复时先停止服务，保留当前数据库及其同名 -wal、-shm 文件到另一个归档目录；不要将旧的 WAL 与备份混用。将备份复制到一个全新的目录，设置 STUDYSEAT_DATABASE 指向该文件，沿用原密钥后启动服务，检查健康接口、预约列表和审计。确认恢复成功后再处理旧目录。回滚源码不等于回滚数据库；规则和预约不得因恢复演示而悄悄丢失。
-
-## 演示顺序
-
-1. 初始化公开演示账号，学生 A 创建明日预约，刷新后记录仍在。
-2. 退出并以学生 B 登录，同座位同时间预约被拒绝；不能读写 A 的记录。
-3. 运行 phase3-browser.cjs 的独立演示，使用真实 API 创建开始于两分钟后的预约，页面签到、暂离、返回；不修改生产时钟。
-4. 管理员对使用中的房间预览关闭，看到阻断；对含待签到预约的座位预览、确认关闭。
-5. 重新开放，确认已经取消的预约不复活；学生刷新显示一致结果。
-6. 展示 process_smoke.py 结果，证明重启、重登、幂等和审计恢复。
-
-## 版本与放行
-
-性能结果在 evidence/phase4/performance.json，回归摘要在 verification.json，后端 JUnit 在 pytest.xml，六套页面结果与截图位于对应子目录。版本的源文件 SHA256 在 evidence/phase4/source-manifest.json。仅在 verification.json 为 passed 且源文件摘要一致时，将对应测试结果用于本候选版本。
-
-目前交付为本机课程验收候选版。非作者审查、团队正式验收、干净机器首次安装、公开部署和百人并发指标均需另行验证。登录限速、生产 WSGI/HTTPS、校园认证、通知送达和物理到场验证未在本阶段实现。11 月 28 日为计划中的补验窗口；不得提前写成已发生。
+任务为 Issue #7，合并请求为 PR #8。当前技术审查、验证和合并权限状态见 PHASE4-MERGE-REVIEW.md。GitHub 上传、技术审查、合并和团队现场签收分别记录，不互相替代。原型测试未在本次 Alpha 集成验证中复跑。

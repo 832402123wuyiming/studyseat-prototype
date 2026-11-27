@@ -34,11 +34,11 @@ FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本�
 | GET /reservations/{id} | 本人预约 | 200，单个预约；他人或不存在均 404 |
 | POST /reservations/{id}/cancel | 无需请求体；本人、PENDING_CHECKIN | 200，CANCELLED 预约；重复取消仍 200，不改首次 ended_at 或审计 |
 
-预约输出含 id、student_id、seat_id、room_id、room_name、seat_label、start_at、end_at、status、rule_version_id、rule_snapshot、created_at、checked_in_at、leave_started_at、leave_deadline、ended_at。不输出幂等键，也不输出其他学生身份或冲突记录。未实现的状态操作时间字段保持 null，取消时 ended_at 为首次取消时间。
+预约输出含 id、student_id、seat_id、room_id、room_name、seat_label、start_at、end_at、status、rule_version_id、rule_snapshot、created_at、checked_in_at、leave_started_at、leave_deadline、ended_at。不输出幂等键，也不输出其他学生身份或冲突记录。状态操作时间字段按实际发生写入，尚未发生的保持 null；取消时 ended_at 为首次取消时间。
 
 时间输入严格为 `YYYY-MM-DDTHH:mm:ss[.ffffff]Z` 或相同格式加 `±HH:mm`；拒绝无时区、非法日期、倒置和零长度区间。URL 参数中的 `+` 应编码为 `%2B`（使用 URLSearchParams/urlencode）。先规范化为 UTC 六位微秒 `Z` 再比较和保存。区间 `[start,end)`，两端相邻允许。规则版本和完整 settings 快照保存于预约，不随新规则修改。
 
-服务端当前时间判断：开始不能在过去，最长 240 分钟（含边界），开始日期至多为北京时间今天 +7 日（含第七日，按日历日而非 168 小时）；结束可跨日但整个区间须处于房间每日开放范围内，00:00—24:00 房间允许跨午夜。房间与座位均须启用，已有未重开关闭记录也阻止预约。规则参数从当前最新 rule_versions 集中读取；查询同样使用此校验。取消仅允许 PENDING_CHECKIN；沿用原型按状态判断，不额外设置开始前截止时间。已取消的重放始终返回原取消结果。
+服务端当前时间判断：开始不能在过去，最长 240 分钟（含边界），开始日期至多为北京时间今天 +7 日（含第七日，按日历日而非 168 小时）；结束可跨日但整个区间须处于房间每日开放范围内，00:00—24:00 房间允许跨午夜。房间与座位均须启用，已有未重开关闭记录也阻止预约。规则参数从当前最新 rule_versions 集中读取；查询同样使用此校验。取消仅允许经过超时补处理后仍为 PENDING_CHECKIN 的预约；不额外设置开始前截止时间。已取消的重放始终返回原取消结果。
 
 查询结果为即时参考，排除未启用座位、关闭座位、与有效预约重叠的座位；本人已有跨座位重叠预约时返回空列表。有效占用状态为 PENDING_CHECKIN、IN_USE、ON_LEAVE；终态不占用。
 
@@ -60,36 +60,50 @@ FR-02 对应登录基础与账号安全，FR-12 对应规则读取基础；本�
 | 403 | FORBIDDEN | 角色无权限 |
 | 403 | CSRF_INVALID | CSRF 缺失或不匹配 |
 | 404 | NOT_FOUND | 记录不存在或不归本人；未知路径也返回 JSON 404 |
-| 409 | STATE_NOT_ALLOWED | 当前状态或时间窗口不允许该操作 |
-| 409 | ALREADY_CLOSED | 资源已有未重开的关闭记录 |
-| 409 | CLOSURE_BLOCKED | 仍有使用中或暂离中的预约，不能关闭 |
-| 409 | PREVIEW_STALE | 关闭影响已变化，需要重新预览 |
-| 409 | PREVIEW_INVALID / PREVIEW_EXPIRED | 预览凭据被篡改或超过 5 分钟 |
 | 413 | REQUEST_ENTITY_TOO_LARGE | 请求体超过 8 KiB |
 | 503 | DATABASE_BUSY | 锁等待超过 5 秒，Retry-After: 1；写入未成功 |
 | 503 | DATABASE_UNAVAILABLE / NOT_INITIALIZED | 数据库未就绪或缺少初始化数据 |
 
-## 阶段三使用与管理接口 已实现
+## 阶段三状态与管理接口 已实现
 
-签到、暂离、返回、结束均要求本人学生会话和 CSRF；管理员和学生角色互斥。每次操作在 `BEGIN IMMEDIATE` 中先执行超时释放，再校验归属与状态，更新和审计同一事务提交。重复操作返回当前记录，不覆盖首次有效时间、不重复审计。
+数据库版本为 2，首次升级执行 `flask --app studyseat init-db`（演示数据可加 `--demo`）。v1 表声明保持不变，新增迁移保留原数据。
 
-| 方法与路径 | 请求与约束 | 成功输出 |
+除只读 GET 外，下列接口均要求会话、相应角色和 CSRF。状态操作强制本人归属，他人和不存在均 404。所有写操作（仅预览除外）提交 `idempotency_key`：1—100 字符，按执行者隔离，绑定操作类型与载荷，同键异操作/异载荷 409。已有取消接口仍允许无请求体。
+
+| 方法与路径 | 请求与约束 | 输出 |
 | --- | --- | --- |
-| POST /reservations/{id}/check-in | 本人、PENDING_CHECKIN、当前时间在 `[开始−提前, 开始+延后]` 闭区间内 | 200，IN_USE；`checked_in_at` 为首次签到时间 |
-| POST /reservations/{id}/leave | 本人、IN_USE、未到结束时间 | 200，ON_LEAVE；`leave_deadline` 为当前时间加暂离上限 |
-| POST /reservations/{id}/return | 本人、ON_LEAVE、未严格超过 `leave_deadline` | 200，IN_USE；清除暂离时间字段 |
-| POST /reservations/{id}/finish | 本人、IN_USE 或 ON_LEAVE | 200，COMPLETED；`ended_at` 为首次结束时间 |
-| POST /admin/rules | 管理员、CSRF、完整五项整数设置 | 200，新 `version` 和 `settings`；已有预约保留旧快照 |
-| GET /admin/resources | 管理员 | 房间与座位目录，供关闭范围选择 |
-| GET /admin/closures | 管理员 | 关闭记录，含房间/座位、原因、创建人、重开时间 |
-| POST /admin/closures/preview | 管理员、CSRF、`room_id` 或 `seat_id` 二选一、原因 | 200，影响清单、`can_apply`、5 分钟签名 `token`；不写业务数据 |
-| POST /admin/closures | 管理员、CSRF、范围、原因、预览 `token` | 201，关闭记录和已取消预约 ID；待签到预约转为 CANCELLED |
-| POST /admin/closures/{id}/reopen | 管理员、CSRF | 200，`reopened_at`；不恢复已取消预约，重复调用保持首次时间 |
+| POST /reservations/{id}/check-in | student；操作键；快照签到窗口两端包含 | 当前预约；首次签到时间不被重放覆盖 |
+| POST /reservations/{id}/leave | student；操作键、expected_version；仅使用中，新一轮暂离使用新键 | 暂离中，leave_started_at、leave_deadline |
+| POST /reservations/{id}/return | student；操作键、expected_version；仅暂离中，截止包含且尚未到 end | 使用中；旧轮次相同键重放不改变新轮次 |
+| POST /reservations/{id}/finish | student；操作键；使用中或暂离中 | 已结束；重复结束保留首次 ended_at |
+| GET /admin/reservations | admin | 所有学生的同一份真实预约，含终态 |
+| GET /admin/resources | admin | seats 和 closures（包括已重新开放记录） |
+| POST /admin/rules | admin；settings 完整五项、base_version、操作键 | version、settings；旧版本冲突 409，内容相同不新增版本 |
+| POST /admin/rooms/{room_id}/hours | admin；opens_minute、closes_minute、base_hours:[旧开始,旧结束]、操作键 | 房间；若影响有效预约则 409，旧开放时间不匹配则 409 |
+| POST /admin/closures/preview | admin；room_id 或 seat_id 二选一、reason | affected、blockers、target、fingerprint、preview_token、300 秒有效期、server_time；只读无副作用 |
+| POST /admin/closures | admin；preview_token、操作键 | 关闭记录；锁内复核影响，变化 409 PREVIEW_STALE；存在使用中/暂离中为 409 RESOURCE_IN_USE |
+| POST /admin/closures/{id}/reopen | admin；操作键 | 关闭记录，首次 reopened_at 不被重复请求覆盖，不恢复预约 |
 
-超时释放由服务端在读列表、查询余量、创建、取消和状态操作前统一执行：PENDING_CHECKIN 严格超过签到截止转为 EXPIRED；ON_LEAVE 严格超过暂离截止转为 EXPIRED；IN_USE/ON_LEAVE 到达结束时刻转为 COMPLETED。恰好处于截止时刻仍允许签到或返回。终态不能复活，释放后座位可被重新预约。审计动作分别为 RESERVATION_CHECKED_IN、RESERVATION_LEFT、RESERVATION_RETURNED、RESERVATION_COMPLETED、RESERVATION_EXPIRED、RESERVATION_AUTO_COMPLETED、RESERVATION_CLOSED、RESOURCE_CLOSED、RESOURCE_REOPENED、RULES_UPDATED。
+完整设置的范围：max_duration_minutes 1—1440，max_advance_days 1—30，check_in_early_minutes 和 check_in_late_minutes 0—240，leave_limit_minutes 1—240。全部必须为整数，布尔值、缺项、额外项和越界均 400。损坏的当前规则或预约快照返回 503 RULES_UNAVAILABLE。
 
-规则写入只接受完整五项：`max_duration_minutes` 15—1440、`max_advance_days` 0—30、`check_in_early_minutes` 0—120、`check_in_late_minutes` 0—120、`leave_limit_minutes` 1—240，均须为整数，不接受布尔、字符串或小数。新版本只影响之后创建的预约。
+规则写入需提交读取到的 base_version；只有配置发生变化才新增不可变版本与审计。预约继续使用自身 rule_snapshot。管理端开放时间修改需覆盖当前全部有效预约，否则要求先处理预约；参数是每日北京时间 00:00 起分钟，允许结束为 1440。
 
-关闭预览按服务端当前时间计算“生效状态”，但不写库；`can_apply` 在使用中或暂离中的预约时为 false。确认关闭会重新执行超时释放并按范围、原因、预约 ID/状态/时段重算影响，与 `token` 不一致返回 409；仍有使用中或暂离中预约时拒绝关闭。关闭只取消 PENDING_CHECKIN 预约并写关联审计；房间关闭阻止该房间新预约，座位关闭只阻止该座位。重开只清除关闭状态，不恢复已取消记录。预览与确认的时间上限为 5 分钟，签名基于服务端密钥，篡改或过期均拒绝。
+签到按 `[start-early,start+late]` 判断，严格超过迟到截止才过期，预约区间到 end 即不再使用。暂离 deadline 为 min(首次暂离时间+快照上限,end)，恰好在 deadline 且尚未到 end 时允许返回。暂离截止先于 end 且严格超时为 EXPIRED；end 先到或二者相等时自然 COMPLETED。待签到记录无论多晚补处理仍是 EXPIRED，不会当作正常完成。ended_at 保存实际生效边界，审计 occurred_at 保存任务实际处理时刻。
 
-阶段三错误补充：409 STATE_NOT_ALLOWED（状态或时间窗口不允许）、ALREADY_CLOSED、CLOSURE_BLOCKED、PREVIEW_STALE、PREVIEW_INVALID、PREVIEW_EXPIRED。阶段二的事务、幂等和锁等待策略继续有效。
+签到、返回、结束重放返回预约当前状态；不会使终态复活。已签到后的签到重试不会从暂离返回；新一轮暂离/返回必须使用新操作键。操作键凭据和预约变更、审计在一个 BEGIN IMMEDIATE 中提交。超时判定在取得锁后取服务端时间；迟到请求返回状态错误前保留已完成的超时转换，审计失败则整体回滚。
+
+`flask --app studyseat expire-reservations` 单次执行补偿；加 `--watch --interval 30` 作为独立工作进程，不依赖网页打开。并行执行或重启后重跑不重复迁移和记审计。本人列表、预约详情、查询、创建和管理员预约列表也做服务端补处理。查询结果仍只是即时参考，创建时重新校验。
+
+关闭是立即生效、持续到手动重新开放的最小实现，不提供未来定时关闭。预览签名绑定管理员、资源、原因及当时影响摘要，300 秒失效；确认不接受替换范围。确认锁内校验原始影响摘要、资源和关闭记录，新增预约、取消或签到都会令旧预览失效。预览本身不执行超时或审计写入；数据已到期需刷新管理数据补处理后重新预览。使用中与暂离中阻断关闭，沿用当前原型，和旧 SRS 差异仍待团队确认。关闭记录、取消的待签到预约及对应审计整体提交；重新开放不复活已取消记录。通知仅为站内操作记录，没有真实投递。
+
+新增错误：409 RULE_VERSION_CONFLICT、RESOURCE_CHANGED、RESERVATIONS_AFFECTED、PREVIEW_STALE、RESOURCE_IN_USE；保留既有 AUTH_REQUIRED、FORBIDDEN、CSRF_INVALID、NOT_FOUND、DATABASE_BUSY 等契约。验证步骤与本轮结果见 [PHASE3.md](PHASE3.md)。
+
+## 阶段三独立审查补充契约
+
+数据库 v3 新增预约 state_version（非负整数，旧记录从 0 开始）。创建初始为 0，签到、暂离、返回、结束、取消、资源关闭取消与超时实际改变状态时加 1；无副作用的重复操作不递增。列表、详情及写入返回均含该字段。
+
+leave/return 必须发送 `{idempotency_key, expected_version}`，expected_version 取自该次操作观察到的预约快照；缺失、布尔、负数或非整数为 400 INVALID_INPUT。服务端在 BEGIN IMMEDIATE 内先补处理超时、核对原操作回执，再比较预期版本与当前版本。首次迟到/并发旧版本为 409 STALE_RESERVATION，不改当前轮次、暂离截止或新增回执/操作审计；若已超时，合法超时结果仍提交。相同操作键必须绑定同一 expected_version、操作及预约，异前提返回 409 IDEMPOTENCY_CONFLICT。已记录的同键同前提重放返回当前预约，不重新执行旧暂离/返回。签到和结束无循环风险，既有幂等输入保持有效。
+
+v1/v2 数据与历史回执升级时保留；历史 leave/return 回执不补造缺失的轮次前提。升级后刷新客户端，新的界面读取 state_version 并生成新操作键；旧客户端缺少前提会被拒绝，不能静默按最新版本替换旧请求。
+
+expire-reservations --watch 遇到 SQLITE_BUSY/SQLITE_LOCKED 会回滚、输出重试信息并有界指数退避（首次为 min(interval,30) 秒、最多 30 秒），成功后恢复正常间隔。单次模式锁忙与不可恢复数据库错误仍非零退出；不吞掉数据库损坏或审计完整性错误。

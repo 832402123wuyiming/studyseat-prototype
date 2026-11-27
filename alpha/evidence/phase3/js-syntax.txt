@@ -1,4 +1,0 @@
-﻿node --check studyseat/static/app.js
-exit 0
-node --check tests/phase3-browser.cjs
-exit 0

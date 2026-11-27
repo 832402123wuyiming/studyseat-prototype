@@ -103,7 +103,7 @@ async function hold(page, endpoint) {
       assert.equal(await page.locator('#note').inputValue(), '');
       assert.equal(await page.locator('#password').inputValue(), '');
       assert.equal(await page.locator('#admin').isVisible(), false);
-      await login(page, 'admin'); await contains(page, 'events', 'LOGIN'); await logout(page);
+      await login(page, 'admin'); await contains(page, 'events', '登录'); await logout(page);
       assert.equal(await page.locator('#events').textContent(), '');
       assert.equal(await page.locator('#admin').isVisible(), false);
     });
@@ -121,7 +121,7 @@ async function hold(page, endpoint) {
       assert.equal((await page.locator('#notes').textContent()).includes(marker), false);
     });
     await scenario('T3-rules-failure-hides-admin', async page => {
-      await login(page, 'admin'); await contains(page, 'events', 'LOGIN'); await logout(page);
+      await login(page, 'admin'); await contains(page, 'events', '登录'); await logout(page);
       const remove = await fail(page, '/rules'); await login(page, 'B');
       await contains(page, 'status', '测试模拟的读取失败');
       assert.equal(await page.locator('#admin').isVisible(), false);
@@ -131,7 +131,7 @@ async function hold(page, endpoint) {
     });
     for (const [who, endpoint, node] of [['A', '/persistence-notes', 'notes'], ['admin', '/admin/audit-events', 'events']]) {
       await scenario(`T4-delayed-${node}`, async page => {
-        await login(page, who); await contains(page, who === 'A' ? 'notes' : 'events', who === 'A' ? 'A_PRIVATE_' : 'LOGIN');
+        await login(page, who); await contains(page, who === 'A' ? 'notes' : 'events', who === 'A' ? 'A_PRIVATE_' : '登录');
         const pending = await hold(page, endpoint);
         await page.locator('#note').fill(`DELAYED_${Date.now()}`);
         await page.locator('#note-form button').click(); await pending.ready;

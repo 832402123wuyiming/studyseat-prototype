@@ -134,7 +134,7 @@ async function hold(page, endpoint) {
     await search(page);
     assert.equal(await page.locator(`#seat-id option[value="${seat}"]`).count(), 0);
     await logout(page); await login(page, 'A');
-    await page.getByRole('button', { name: '取消预约' }).first().click();
+    await page.locator('#reservations').getByRole('button', { name: '取消预约', exact: true }).click();
     await contains(page, 'status', '已取消');
     const cancelled = (await backend(page, '/reservations/' + committed.id)).body.data;
     assert.deepEqual((await backend(page, '/reservations/' + committed.id + '/cancel', true)).body.data, cancelled);

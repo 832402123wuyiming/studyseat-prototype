@@ -50,7 +50,7 @@ const { chromium } = require('playwright');
     await page.locator('#username').fill('admin01');
     await page.locator('#password').fill('Admin1234');
     await page.getByRole('button', { name: '登录', exact: true }).click();
-    await page.locator('#events').filter({ hasText: 'PERSISTENCE_NOTE_CREATED' }).waitFor();
+    await page.locator('#events [data-action="PERSISTENCE_NOTE_CREATED"]').filter({ hasText: '保存验证文本' }).waitFor();
     await page.screenshot({ path: path.join(evidence, 'admin-dashboard.png'), fullPage: true });
     assert.deepEqual(errors, []);
     const report = { result: 'passed', executed_at: new Date().toISOString(), browser: await browser.version(), playwright: require('playwright/package.json').version, checks: ['desktop login', 'mobile no overflow', 'wrong password rejected', 'student login', '4 shared rooms', 'admin API returns 403 for student', 'note survives refresh', 'student B isolation', 'logout', 'admin audit data', 'no uncaught page errors'] };

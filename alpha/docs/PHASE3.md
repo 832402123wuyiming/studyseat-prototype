@@ -1,96 +1,121 @@
-# 11 月 25—26 日阶段三记录
+# 第三阶段 使用与管理联动
 
-实际开发与验证日期：2026-11-25。目标：在阶段二预约主流程之上打通签到、暂离、返回、结束、超时释放、管理员规则版本与资源关闭。实际工作为本次 AI 辅助开发，不将工作量追溯归属到附件计划中的成员；非作者审查和团队正式验收仍待执行。
+依据《StudySeat_代码规范与冲刺计划》的 11 月 25—26 日安排，实现学生使用状态、超时释放与管理端共享数据。开发基线是已合并阶段二 PR #3 的 main：`07e6d64df6b6a3d668147b7b625d05836f351f22`。独立目录 `studyseat-phase3`，分支 `codex/phase3-attendance-admin`；原型和阶段二目录的既有文件不改动。
 
-## 工作环境与基线
+## 已实现行为
 
-- 基线：GitHub `main` 的 `07e6d64`（阶段二 PR #3 已合并）。
-- 本地 Git 根目录：`studyseat/`，导入基线提交 `f36736d`。
-- 运行环境：Windows 11（10.0.26300）、Python 3.13.3、SQLite 3.49.1、Flask 3.1.3、Werkzeug 3.1.9、pytest 8.3.5、Ruff 0.17.6、Node.js 24.19.0、Playwright 1.62.1、Microsoft Edge 158.0.4370.33。
-- 依赖从 `requirements-dev.txt` 安装；本轮使用清华镜像完成安装。演示与测试数据库均为独立文件，未改动 `alpha/instance` 日常数据。
+学生页面通过真实 API 完成签到、暂离、返回、结束；保留原查询、预约、取消。所有状态判断在服务端，角色、本人归属、Cookie 会话和 CSRF 校验继续有效。六状态模型、不可复活终态、旧规则快照、UTC 持久化及北京时间显示沿用既有约定。
 
-## 已实现内容
+签到窗口包含前后两个端点；暂离截止严格超时才过期。自然结束、未签到过期、暂离过期按先发生的有效边界处理，补处理晚到不改变归因。超时的 ended_at 为应生效时间，审计为实际处理时间。预约剩余占用由状态与区间直接计算，无额外需要同步的库存。
 
-新增 `studyseat/attendance.py` 与 `studyseat/admin.py`，沿用现有 `BEGIN IMMEDIATE` 写事务、`ApiError` 和审计模式；`api.py` 增加学生状态操作与管理接口，前端接入对应按钮、规则表单和关闭预览/确认/重开。
+独立 `expire-reservations` CLI 支持单次及轮询工作进程，服务停止时仍可执行；两进程重复处理只产生一次状态变化和审计。相关读取与创建也执行补处理。请求等待数据库写锁后才取服务端时间，签到或取消等待期间越过截止则拒绝请求，并保留超时结果。
 
-### 签到、暂离、返回与结束
+所有新写接口使用持久化操作键，绑定执行者、操作与载荷。暂离/返回携带观察到的 expected_version，旧请求首次迟到或同键重放均不改变新轮次状态；重放保留首次时间和单条审计。预约变化、操作键和审计共同提交，审计失败则回滚。
 
-- 签到仅接受 PENDING_CHECKIN，窗口为开始前 10 分钟至开始后 15 分钟的闭区间；恰好到截止时刻仍允许签到，严格超过才超时。
-- 暂离仅接受 IN_USE，`leave_deadline` 为当前服务端时间加规则快照中的暂离上限；返回恰好到截止时刻仍允许。
-- 结束接受 IN_USE 或 ON_LEAVE，首次 `ended_at` 不被重复请求覆盖。
-- 每个操作先校验归属，他人或不存在均返回 404；学生与管理员角色互斥；所有 POST 校验 CSRF。
-- 重复签到、暂离、返回、结束返回当前记录，不重复写审计；终态不能复活。
+管理端读取与学生端同一份预约、规则与资源，可保存完整规则新版本、调整每日开放分钟，预览并确认立即关闭资源、重新开放和查看关联日志。规则保存使用版本前提，开放时间修改拒绝覆盖不了有效预约的配置；已有预约规则快照保持不变。管理日志展示中文操作与原因，开放时间使用北京时间时分输入。前端保留未保存规则退出提醒，管理员验证文本保存不清理管理表单，读取保留未保存规则草稿；保存期间新编辑的草稿不会被迟到回执清除。
 
-### 超时释放
+关闭预览显示受影响学生、座位、时段和预约编号，并明确列出阻断记录；预览为纯读，无预约、审计或预览行写入。签名摘要绑定管理员、范围、原因和影响状态，300 秒有效。确认在写锁内重新读取，变化要求重新预览；使用中或暂离中的预约阻断关闭。关闭仅取消受影响的待签到预约，整间与单座均可操作；关闭、取消和审计失败整体回滚。重新开放只修改关闭记录，绝不恢复已取消预约。
 
-`attendance.expire_due` 在列表、详情、余量查询、创建、取消和状态操作前统一执行：
+前端继续保留身份、座位查询和预约列表版本保护；新增管理读取版本及预览版本，旧管理结果或旧错误不能覆盖关闭后的新状态与反馈。退出清空管理列表、规则表单和预览。
 
-| 当前状态 | 触发条件 | 迁移 | 审计 |
-| --- | --- | --- | --- |
-| PENDING_CHECKIN | 严格超过签到截止 | EXPIRED | RESERVATION_EXPIRED |
-| ON_LEAVE | 严格超过暂离截止，且未到结束时刻 | EXPIRED | RESERVATION_EXPIRED |
-| IN_USE / ON_LEAVE | 到达预约结束时刻 | COMPLETED，`ended_at` 取结束时刻 | RESERVATION_AUTO_COMPLETED |
+## 数据升级与启动
 
-每次迁移带状态条件更新，只有实际更新成功才写一条审计；释放后占用立即从余量查询中消失。该实现不依赖后台常驻任务，代价是读路径也进入写事务，课程演示规模可接受。
+数据库从 v1/v2 原子升级到 v3，保留 v1 表声明和原始记录；保留 v2 操作回执表及审计详情字段，新增 v3 预约状态版本。请先停止服务并备份原数据库，再按 [运行说明](../README.md) 使用原数据库路径和稳定密钥执行 `flask --app studyseat init-db`，不要删库。升级失败回滚，重复执行不重复迁移。部署回退必须恢复旧库备份，不能让旧代码直接连接 v3。
 
-### 管理员规则版本
+服务与独立任务分别启动，后者使用相同配置执行 `flask --app studyseat expire-reservations --watch --interval 30`。读取补处理作为恢复措施，独立任务才承担无人访问时的周期处理。没有把页面倒计时当作后台任务。
 
-- `POST /admin/rules` 只接受完整五项整数设置，范围：单次最长 15—1440、提前 0—30 天、签到提前 0—120 分钟、签到延后 0—120 分钟、暂离 1—240 分钟。
-- 新设置插入新的 `rule_versions` 行并写 RULES_UPDATED 审计；已有预约保留原版本和完整快照，新预约使用最新版本。
-- 布尔、小数、字符串、缺失键和越界值均返回 400，不产生新版本。
+## 验收主线
 
-### 资源关闭与重开
+1. 学生 A 创建开始在未来 10 分钟内的预约，页面签到、暂离；刷新与使用原库原密钥重启后仍为暂离中，返回再结束。重复请求不更改首次有效时间。
+2. 学生 B 无法看到 A 的预约；四种状态操作他人记录均 404，管理接口为 403。退出清空私有页面数据。
+3. 验证签到前 10 分钟、开始后 15 分钟及后一微秒；暂离截止等于当前时刻与后一微秒；预约结束、暂离与结束同刻及延迟补处理。
+4. 管理员看到 A 的同一预约，保存规则 v2；新预约读取新规则，旧预约继续按旧快照签到与暂离。未保存退出有确认，陈旧版本提交拒绝。
+5. B 创建未来预约，管理员预览不写库，确认关闭后 B 刷新见取消；再次预约该座位失败。重新开放后可创建新预约，旧预约仍取消。
+6. 预览后新增预约、取消、签到或资源状态改变，确认均拒绝旧预览。使用中或暂离中预约即使重新预览也阻断关闭。
+7. 服务停止后执行超时 CLI，包括两独立进程竞争同一到期记录；只记一条超时审计，剩余时段可再次预约。
 
-- 预览按服务端当前时间计算生效状态，但不写业务数据；返回影响清单、`cancellable_count`、`blocking_count`、`can_apply` 和 5 分钟 HMAC 签名 `token`。
-- 存在 IN_USE 或 ON_LEAVE 预约时 `can_apply=false`，确认关闭返回 409 CLOSURE_BLOCKED，要求结束后重新预览。该口径与旧 SRS TR-10 不同，**待团队确认**。
-- 确认关闭在事务内重新执行超时释放、复核资源和未重开关闭，再按范围、原因、预约 ID/状态/时段重算影响；与 `token` 不一致返回 409 PREVIEW_STALE。篡改或过期分别返回 PREVIEW_INVALID / PREVIEW_EXPIRED。
-- 关闭只取消 PENDING_CHECKIN 预约，每条写 RESERVATION_CLOSED 审计，并写 RESOURCE_CLOSED；房间关闭阻止该房间新预约，座位关闭只影响该座位。
-- 重开只设置 `reopened_at` 并写 RESOURCE_REOPENED，不恢复已取消预约；重复重开保持首次时间，不重复审计。
+## 实测结果和证据
 
-### 页面
+完整自动化命令：项目根目录设置 Node/Playwright 路径和 `STUDYSEAT_BROWSER_CHANNEL=chrome` 后运行 `python alpha/scripts/verify_phase3.py`。使用独立数据库和临时服务，不指向日常实例；每组浏览器使用新数据库，原型回归在临时导出副本运行。
 
-学生端预约条目按状态显示取消/签到/暂离/返回/结束按钮，操作后刷新本人列表并释放对应余量查询；管理员端增加规则表单、关闭范围/目标/原因、预览影响、确认关闭、关闭记录与重开按钮，并保留审计列表。页面没有新增前端时间判断，签到窗口、暂离截止和关闭阻断均由服务端决定。
+最终结果以 [verification.json](../evidence/phase3/verification.json) 为准。后端涵盖旧阶段与新增状态、管理、迁移及真实独立连接竞争；浏览器涵盖原有五组及阶段三跨端操作、迟到管理列表、迟到错误、保存中的新草稿与移动端布局；独立进程检查覆盖真实 v1 数据升级、会话与暂离恢复及两超时进程。最终完整运行于北京时间 2026-11-25 21:02 结束，验证器 exit 0，无失败或跳过。执行文件 35 项 SHA-256 已逐一核对，与交付源码一致。
 
-## 验收步骤
-
-1. 学生 A 创建一条数分钟后开始的预约，在签到窗口内点击“签到”，状态变为使用中；点击“暂离”后显示暂离截止，再点击“返回”恢复使用中。
-2. 点击“结束”，状态变为已结束；重复点击不改变首次结束时间。
-3. 创建一条不签到预约，超过签到截止后刷新列表，状态变为已超时，该座位此时段重新出现在余量查询中。
-4. 管理员保存新规则版本，学生端规则提示更新；既有预约仍显示原规则版本和快照。
-5. 管理员预览关闭一个含待签到预约的座位，确认后该预约变为已取消；重开后该记录仍为已取消，其他学生可重新预约。
-6. 对含使用中预约的房间预览关闭，应显示阻止关闭且确认按钮不可用；结束该预约后重新预览方可关闭。
-
-## 自动化验证
-
-| 检查及命令 | 实际结果 | 证据 |
+| 本轮实际验证 | 结果 | 证据 |
 | --- | --- | --- |
-| `python -m pytest -q --junitxml=evidence/phase3/pytest.xml` | 110 passed，0 failed，0 skipped；含阶段一、二既有 89 项与本轮新增 21 项 | [输出](../evidence/phase3/pytest.txt)、[JUnit](../evidence/phase3/pytest.xml) |
-| `python -m ruff check .` | All checks passed | [lint](../evidence/phase3/ruff-check.txt) |
-| `python -m ruff format --check .` | 26 files already formatted | [format](../evidence/phase3/ruff-format.txt) |
-| `node --check studyseat/static/app.js`、`node --check tests/phase3-browser.cjs` | exit 0 | [syntax](../evidence/phase3/js-syntax.txt) |
-| Playwright + Edge 页面冒烟（根目录 `node alpha/tests/phase3-browser.cjs`，独立测试库） | 13 项检查通过，0 page errors；含学生暂离/返回、管理员阻止关闭、座位关闭、重开 | [结果](../evidence/phase3/browser/results.json)、[截图](../evidence/phase3/browser/screenshots/) |
+| pytest 完整后端 | 149 passed，含原阶段 89 项与新增 60 项 | [输出](../evidence/phase3/pytest.txt)、[JUnit](../evidence/phase3/pytest.xml) |
+| Ruff 检查及格式 | 全部通过，28 个 Python 文件格式合规 | [检查](../evidence/phase3/ruff-check.txt)、[格式](../evidence/phase3/ruff-format.txt) |
+| JavaScript 语法与原型单测 | 语法通过，原型 70 passed | [单测](../evidence/phase3/prototype-tests.txt) |
+| 原五组 Alpha 浏览器 | 基础 11 检查点、账号 6 场景、预约 6 组、初始化 6 场景、列表 7 场景均通过 | [基础](../evidence/phase3/browser/browser.json)、[账号](../evidence/phase3/account-switch/results.json)、[预约](../evidence/phase3/reservations-browser/results.json)、[初始化](../evidence/phase3/initialization-browser/results.json)、[列表](../evidence/phase3/reservation-list-browser/results.json) |
+| 阶段三浏览器 | 12 项跨端与延迟响应检查通过，无 page errors | [结果](../evidence/phase3/phase3-browser/results.json) |
+| 真实进程与迁移 | v1 真实预约及审计升级保留，双服务进程重启后会话及暂离恢复，两独立超时进程只处理一次 | [阶段三进程](../evidence/phase3/restart/phase3-process-smoke.json)、[既有持久化](../evidence/phase3/restart/process-smoke.json) |
+| 临时导出原型浏览器 | 六流程全部通过 | [原型结果](../evidence/phase3/prototype-browser/results.json) |
 
-后端新增用例覆盖：签到窗口两端与超窗、重复签到、签到超时释放、暂离/返回截止、结束与自动完成、错误归属/角色/CSRF、规则版本与快照、规则校验、关闭预览只读、确认取消、阻断、过期/篡改/失效预览、座位范围、重开不恢复和重复重开。
+11 组可输出的独立连接竞争结果另存 [并发明细](../evidence/phase3/concurrency.json)，其原始记录与 SHA-256 来自本轮 pytest 输出。包含既有 5 组、重复签到/结束/关闭、签到争抢关闭、预约争抢关闭及重复超时处理 6 组；其他时间边界、锁等待与迁移竞争仍由后端断言覆盖，没有将线程模拟当成前端点击证明。
 
-阶段二原有的“开始两天后仍可取消待签到预约”预期已随超时释放改为 409 + EXPIRED；这是阶段三状态机的有意变更，用例已同步更新并保留其余阶段二断言。
+本机环境为 macOS 27.2.1 arm64、Python 3.13.15、SQLite 3.50.4、Flask 3.1.3、Werkzeug 3.1.9、pytest 8.3.5、Ruff 0.17.6、Chrome 156.0.8078.48；浏览器通过 Playwright 运行，Windows/Edge 未执行。
 
-页面冒烟使用独立演示数据库和在本机启动的临时服务（127.0.0.1:5058），未指向日常数据库；截图保留真实中文界面，仅用于本轮验收说明。
+已人工查看 [学生暂离桌面](../evidence/phase3/phase3-browser/student-leave-desktop.png)、[管理员影响预览](../evidence/phase3/phase3-browser/admin-preview-desktop.png)、[关闭后管理页面](../evidence/phase3/phase3-browser/admin-closed-desktop.png)、[学生移动端](../evidence/phase3/phase3-browser/student-mobile.png)、[管理员移动端](../evidence/phase3/phase3-browser/admin-mobile.png)。没有横向溢出、遮挡或缺字；学生最终截图先刷新并与服务端状态对照，不以管理操作前的旧页面充当最终证据。
 
-## 与阶段一、二结果的衔接
+开发过程曾补齐旧测试直接造出的不完整暂离记录，并按新增超时语义调整“过期后仍能取消”的阶段二断言；不通过删除旧覆盖来迁就实现。首次完整验证发现报告生成顺序导致文档导出检查 69 通过 / 1 失败，修正为运行中、失败、通过状态并保留失败证据。展示检查后将日志改为中文、开放时间改为时分输入，并补充预览清单、草稿保护和刷新后截图；相应浏览器断言同步使用实际中文文案。调整期间旧账号切换断言仍等待英文 LOGIN 导致超时，已记录失败并修正。第二次完整验证的旧预约浏览器用例用泛化按钮选择器遇到新增签到按钮，改为明确选择“取消预约”，保留原流程断言；该失败未计为通过。首次受限环境启动本机监听被拒，获工具许可后使用仅 127.0.0.1 的独立测试服务执行。早期失败不计为最终通过。
 
-- 基线一致：阶段三基于上游 `07e6d64`（阶段二 PR #3 合并后的 main）；补丁在干净快照上用 `git am --3way` 应用通过，没有改写阶段一、二的提交或文件归属。
-- 数据结构未变：仍为 schema v1，没有新增表、列或迁移。阶段二创建的数据库可直接被阶段三打开；阶段三只使用阶段二已声明的时间、状态和暂离字段。
-- 旧数据与旧会话实测：用阶段二代码创建数据库、登录会话和一条预约，再用阶段三代码打开同一数据库；旧 Cookie 无需重新登录仍有效，旧预约可读，规则版本和快照保留，随后签到、暂离、返回、结束均成功，四类审计各一条。
-- 阶段二 89 项后端用例仍通过（计入当前 110 项）。唯一有意的行为变更：待签到预约超过签到截止后再取消，由阶段二的 200 改为 409，并把记录落为 EXPIRED；这符合阶段三状态机，阶段二用例已同步更新。
-- 阶段二的双进程重启冒烟 12 项通过；阶段二五套浏览器用例共 36 项通过（基础 11、预约 6、账号切换 6、初始化 6、列表乱序 7）。由于待签到条目新增“签到”按钮，两处 `... button` 选择器改为按“取消预约”定位，业务断言未放宽。
-- 接口保持增量：既有路径、字段、错误码和审计读取不变，只新增阶段三接口与审计动作；管理员历史审计列表会同时显示旧动作和新动作。
-- 本轮兼容性结果见 [compatibility.json](../evidence/phase3/compatibility.json)。
+## 任务与验证对应
 
-## 范围、差异与剩余事项
+| 验收任务 | 主要自动化覆盖 |
+| --- | --- |
+| 签到窗口与服务端时钟 | checkin_both_endpoints、waiting_student_writer、checkin_and_timeout_race |
+| 暂离返回与多轮幂等 | leave_return_multiple_cycles、leave_deadline_equality、operation_keys |
+| 超时与占用释放 | timeout_cli_repetition、timeout_releases_remaining_seat、timeout_audit_failure |
+| 共享规则与旧快照 | rules_shared_snapshots、corrupt_current_rules |
+| 关闭预览、复核与重新开放 | preview_read_only、stale_closure_preview、active_use_blocks_close、room_closure |
+| 事务及真实并发 | lifecycle_audit_failure、closure_failure、independent_phase3_writers |
+| 身份与归属权限 | transition_access_csrf、admin_writes_require_role；既有账号切换浏览器继续运行 |
+| 旧库升级及持久化 | migration_v1、migration_error、concurrent_initializers；真实进程升级/重启脚本 |
+| 两端页面与延迟响应 | 阶段三浏览器 12 项检查；原五组 Alpha 浏览器与原型六流程 |
 
-- 本轮只做本地提交，未推送、未合并、未部署。基线来自上游 `07e6d64`；工作副本包含多次本地提交（服务与测试、页面、文档与证据、悬停修复、浏览器用例），哈希取决于应用到的仓库。推送后需在 GitHub 上补 PR 和非作者审查记录，并以实际提交链接为准。
-- 关闭时存在使用中/暂离中预约即拒绝，是 RULES.md 中待团队确认的口径；若团队决定允许强制关闭，需要新增对使用中预约的处理规则、原因记录和测试。
-- 超时释放为请求触发的惰性迁移，不是定时任务；长时间无请求时，记录会在下一次读取或写入时才落为终态，但占用判断同样使用该迁移，不会把过期记录当作有效占用。
-- 未实现校园统一认证、真实通知、物理门禁、管理统计图表和公网部署；这些不在本轮 Alpha 范围。
-- 本轮只在 Windows + Edge 验证，未复跑 macOS/Chrome；历史阶段二证据保持原样。
-- 非作者审查、团队正式验收和答辩材料仍待完成。
+测试函数名为 [test_phase3.py](../tests/test_phase3.py) 中对应名称的识别片段，完整函数名均以 `test_` 开头。需求对应依据附件的阶段任务和六状态约定，不编造缺少原文的 SRS 验收编号。
+
+## 范围与团队待办
+
+本轮实际开发为 AI 辅助，不追溯归属给计划中的具体同学。功能和自动化证据完成后，仍需非作者审查和团队正式验收才能按原计划标记已验收；未自动建立远程 Issue、推送、创建 PR、合并或发布。
+
+规则值为项目演示参数，学校制度仍待确认。关闭遇到使用中/暂离中时阻断并要求现场处理，沿用当前原型，与旧 SRS 差异仍需团队确认。关闭仅支持立即生效直到重新开放，不提供未来定时关闭。页面签到只记录用户操作，不能证明实际到场。没有真实消息推送、门禁或校园统一认证；审计是站内记录，不能写成通知已送达。
+
+本机验证为 macOS/Chrome；Windows/Edge 尚未执行。生产 HTTPS/WSGI、登录限速及生产部署仍不在此次课程本地验收范围。下一阶段集中进行团队复核、跨平台回归、缺陷修复和交付整理。
+
+## 独立审查修复
+
+2026-11-25，起始根目录 studyseat-phase3、分支 codex/phase3-attendance-admin、HEAD 82c00a1e1b4dc51e409c6150b108297e68aa6742，工作区干净。根 AGENTS.md 已读取，无更深指令；原型和阶段二目录未改动。本轮依据用户转述及提供的 REVIEW.md/证据包逐项修复，审查报告中的“仅审查、不修改”是原审查过程记录，不替代本次修复授权。报告及证据包指纹见 [审查输入](../evidence/phase3-review/review-input.json)。
+
+修复前新增测试实际失败：独立会话、不同 SQLite 连接的首次迟到暂离/返回均错误 200；真实 watch 子进程写锁超时后退出；真实 Chrome 中验证文本迟到回执将新草稿 45 重置成 30（补齐原审查尚未完成的浏览器复核）。[后端失败](../evidence/phase3-review/pre-fix/pytest.txt)、[真实浏览器失败](../evidence/phase3-review/pre-fix/phase3-review-browser/failure.json) 分别保存，不计为通过。
+
+修复包括：v3 增量迁移与状态版本前提；版本绑定 leave/return 回执，事务内比较，拒绝首次迟到请求且保留应生效超时；watch 仅对可恢复 BUSY/LOCKED 回滚并退避重试，永久错误与单次命令保留失败；管理员文本保存不走清空表单的 refresh 链路；规则文档删除“无关闭写接口”的旧阶段限定。接口、升级及任务恢复说明已同步。
+
+新增后端覆盖：同刻多轮版本辨别、已处理键重放与异前提冲突、预期版本输入、同轮不同键争抢、迟到请求超时落库、v2 数据/回执升级和故障回滚、真实 PID 经超过 busy_timeout 的锁竞争后恢复、永久错误/单次失败不误重试，以及 5/15 分钟短预约 end 边界。既有 v1 并发升级断言同步到 v3，原数据保留断言继续有效。新增真实浏览器检查管理员草稿保留与退出提醒、显式保存，以及两个独立学生会话的首次迟到暂离/返回 409、截止和审计不变、刷新恢复。
+
+最终完整验证于北京时间 2026-11-25 22:10 结束，verify_phase3.py exit 0；所有测试使用独立数据库和临时 127.0.0.1 服务，历史 phase3 报告未改动。命令在仓库根目录执行：
+
+```bash
+NODE_PATH=/Users/zhouyiheng/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
+STUDYSEAT_NODE=/Users/zhouyiheng/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node \
+STUDYSEAT_BROWSER_CHANNEL=chrome \
+STUDYSEAT_EVIDENCE_DIR=alpha/evidence/phase3-review/final \
+/tmp/studyseat-phase3-venv/bin/python alpha/scripts/verify_phase3.py
+```
+
+| 本轮检查 | 实际结果 | 证据 |
+| --- | --- | --- |
+| pytest 完整后端 | 169 passed，0 failures/errors/skipped；原仓库 149 项 + 本轮 20 项，不将原独立审查目录的 10 项重复计入 | [输出](../evidence/phase3-review/final/pytest.txt)、[JUnit](../evidence/phase3-review/final/pytest.xml) |
+| Ruff、JS | 全部通过，29 个 Python 文件格式合规 | [lint](../evidence/phase3-review/final/ruff-check.txt)、[format](../evidence/phase3-review/final/ruff-format.txt)、[syntax](../evidence/phase3-review/final/js-syntax.txt) |
+| 原型单测 | 70 passed，0 failures/skipped，单列为模拟原型回归 | [原型单测](../evidence/phase3-review/final/prototype-tests.txt) |
+| 原五组 Alpha 浏览器 | 基础 11 检查点、账号 6、预约 6、初始化 6、列表 7 场景均通过 | [基础](../evidence/phase3-review/final/browser/browser.json)、[账号/CSRF](../evidence/phase3-review/final/account-switch/results.json)、[预约](../evidence/phase3-review/final/reservations-browser/results.json)、[初始化](../evidence/phase3-review/final/initialization-browser/results.json)、[列表](../evidence/phase3-review/final/reservation-list-browser/results.json) |
+| 阶段三跨端浏览器 | 原 12 项检查通过，无 page errors；390px 学生与管理员页面均无横向溢出 | [阶段三](../evidence/phase3-review/final/phase3-browser/results.json) |
+| 新增真实浏览器 | 7 检查点通过：草稿保留/提醒/显式保存、双会话首次迟到 leave/return 409 与恢复、无 page errors | [复查浏览器](../evidence/phase3-review/final/phase3-review-browser/results.json) |
+| 真实 HTTP/进程链路 | v1 数据升级 v3、会话和暂离跨服务重启恢复；双 CLI 处理 1/0 且只有一条超时审计 | [阶段三进程](../evidence/phase3-review/final/restart/phase3-process-smoke.json)、[原持久化](../evidence/phase3-review/final/restart/process-smoke.json) |
+| watch 锁恢复 | 独立连接持锁超过 5 秒后，原 PID 输出 retrying、Reconciled 1、Reconciled 0，未重启且仅一条超时审计 | [独立竞争与 PID 证明](../evidence/phase3-review/final/review-regressions.json) |
+| 静态原型浏览器 | 六个原型流程通过，0 page errors | [原型浏览器](../evidence/phase3-review/final/prototype-browser/results.json) |
+
+[最终验证与 38 项 SHA-256](../evidence/phase3-review/final/verification.json) 已逐项核对最终执行源码。实际环境 macOS 27.2.1 arm64、Python 3.13.15、SQLite 3.50.4、Flask 3.1.3、pytest 8.3.5、Ruff 0.17.6、Node 24.22.3、Playwright 1.62.1、Chrome 158.0.8127.37。本轮已完成此前独立审查因沙箱未运行的浏览器与 HTTP 链路，不以替代测试冒充；Windows/Edge 仍未运行。
+
+人工查看了本轮草稿保留桌面与学生移动端截图；浏览器同时断言移动端宽度。开发中新增迁移的注释分号曾被旧迁移执行器拆成非法 SQL，已修正并补验迁移；一处并发初始化记录数断言随后同步至 v3。中间失败报告保留在 attempts/，未计为通过；最终在文案补齐预约结束例外后重新完整执行。升级前请停服务和任务、备份数据库，执行 init-db 后刷新客户端；日常数据库未在本次测试中修改。
+
+短预约继续按现有“end 优先”执行，文档补齐例外，仍待团队确认；使用中/暂离中阻断关闭与旧 SRS 差异也未代团队批准。本次不推送、不合并、不发布；自动化通过不代替非作者团队成员批准。

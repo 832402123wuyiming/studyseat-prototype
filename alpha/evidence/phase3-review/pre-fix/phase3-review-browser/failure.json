@@ -1,0 +1,6 @@
+{
+  "result": "failed",
+  "error": "AssertionError [ERR_ASSERTION]: late note receipt must preserve the new rule draft\n\n'30' !== '45'\n\n    at /Users/zhouyiheng/Desktop/软件工程/studyseat-phase3/alpha/tests/phase3-review-browser.cjs:49:12",
+  "rule_leave": "30",
+  "status": "已保存，可刷新页面验证。"
+}

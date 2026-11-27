@@ -7,7 +7,8 @@ from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .auth import ApiError
-from .db import write_transaction
+from .db import get_db, write_transaction
+from .policy import valid_settings
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 ACTIVE = "('PENDING_CHECKIN','IN_USE','ON_LEAVE')"
@@ -49,9 +50,8 @@ def rules(connection):
         raise ApiError(503, "NOT_INITIALIZED", "请先初始化规则。")
     try:
         settings = json.loads(row["settings_json"])
-        for key in ("max_duration_minutes", "max_advance_days"):
-            if type(settings[key]) is not int or settings[key] <= 0:
-                raise ValueError
+        if not valid_settings(settings):
+            raise ValueError
     except (ValueError, TypeError, KeyError):
         raise ApiError(503, "RULES_UNAVAILABLE", "当前规则配置无效，请联系管理员。") from None
     return row["id"], settings
@@ -132,58 +132,51 @@ def owned(connection, student_id, reservation_id):
 
 
 def list_owned(student_id):
-    from . import attendance
+    from .lifecycle import sweep
 
-    with write_transaction() as connection:
-        attendance.expire_due(connection)
-        rows = connection.execute(
+    sweep()
+    return [
+        serialize(row)
+        for row in get_db().execute(
             SELECT + " WHERE r.student_id=? ORDER BY r.start_at DESC, r.id", (student_id,)
-        ).fetchall()
-        return [serialize(row) for row in rows]
-
-
-def get_owned(student_id, reservation_id):
-    from . import attendance
-
-    with write_transaction() as connection:
-        attendance.expire_due(connection)
-        return owned(connection, student_id, reservation_id)
+        )
+    ]
 
 
 def available(student_id, room_id, start_at, end_at):
-    from . import attendance
+    from .lifecycle import sweep
 
     start, end = interval(start_at, end_at)
-    with write_transaction() as connection:
-        attendance.expire_due(connection)
-        _, settings = rules(connection)
-        room = room_resource(connection, room_id)
-        now = now_utc()
-        validate_policy(room, start, end, settings, now)
-        if closed(connection, room_id):
-            raise ApiError(409, "RESOURCE_UNAVAILABLE", "房间已关闭。")
-        rows = connection.execute(
-            f"""SELECT s.id, s.room_id, s.label FROM seats s WHERE s.room_id=? AND s.enabled=1
-            AND NOT EXISTS (SELECT 1 FROM resource_closures c WHERE c.seat_id=s.id AND c.reopened_at IS NULL)
-            AND NOT EXISTS (SELECT 1 FROM reservations r WHERE (r.seat_id=s.id OR r.student_id=?)
-              AND r.status IN {ACTIVE} AND r.start_at<? AND ?<r.end_at) ORDER BY s.label""",
-            (room_id, student_id, utc_text(end), utc_text(start)),
-        ).fetchall()
-        return {
-            "seats": [dict(row) for row in rows],
-            "server_time": utc_text(now),
-            "start_at": utc_text(start),
-            "end_at": utc_text(end),
-        }
+    sweep()
+    connection = get_db()
+    _, settings = rules(connection)
+    room = room_resource(connection, room_id)
+    now = now_utc()
+    validate_policy(room, start, end, settings, now)
+    if closed(connection, room_id):
+        raise ApiError(409, "RESOURCE_UNAVAILABLE", "房间已关闭。")
+    rows = connection.execute(
+        f"""SELECT s.id, s.room_id, s.label FROM seats s WHERE s.room_id=? AND s.enabled=1
+        AND NOT EXISTS (SELECT 1 FROM resource_closures c WHERE c.seat_id=s.id AND c.reopened_at IS NULL)
+        AND NOT EXISTS (SELECT 1 FROM reservations r WHERE (r.seat_id=s.id OR r.student_id=?)
+          AND r.status IN {ACTIVE} AND r.start_at<? AND ?<r.end_at) ORDER BY s.label""",
+        (room_id, student_id, utc_text(end), utc_text(start)),
+    ).fetchall()
+    return {
+        "seats": [dict(row) for row in rows],
+        "server_time": utc_text(now),
+        "start_at": utc_text(start),
+        "end_at": utc_text(end),
+    }
 
 
 def create(student_id, seat_id, start_at, end_at, key):
-    from . import attendance
-
     start, end = interval(start_at, end_at)
     start_text, end_text = utc_text(start), utc_text(end)
     with write_transaction() as connection:
-        attendance.expire_due(connection)
+        from .lifecycle import reconcile
+
+        reconcile(connection, now_utc())
         prior = connection.execute(
             "SELECT * FROM reservations WHERE student_id=? AND idempotency_key=?", (student_id, key)
         ).fetchone()
@@ -238,19 +231,23 @@ def audit(connection, student_id, reservation_id, action, now):
 
 
 def cancel(student_id, reservation_id):
-    from . import attendance
+    from .lifecycle import reconcile
 
     with write_transaction() as connection:
-        attendance.expire_due(connection)
         record = owned(connection, student_id, reservation_id)
         if record["status"] == "CANCELLED":
             return record
         now = now_utc()
-        if record["status"] != "PENDING_CHECKIN":
-            raise ApiError(409, "STATE_NOT_ALLOWED", "仅可取消待签到预约。")
-        connection.execute(
-            "UPDATE reservations SET status='CANCELLED', ended_at=? WHERE id=?",
-            (utc_text(now), reservation_id),
-        )
-        audit(connection, student_id, reservation_id, "RESERVATION_CANCELLED", now)
-        return owned(connection, student_id, reservation_id)
+        reconcile(connection, now)
+        record = owned(connection, student_id, reservation_id)
+        allowed = record["status"] == "PENDING_CHECKIN"
+        if allowed:
+            connection.execute(
+                "UPDATE reservations SET status='CANCELLED', ended_at=?,state_version=state_version+1 WHERE id=?",
+                (utc_text(now), reservation_id),
+            )
+            audit(connection, student_id, reservation_id, "RESERVATION_CANCELLED", now)
+            record = owned(connection, student_id, reservation_id)
+    if not allowed:
+        raise ApiError(409, "STATE_NOT_ALLOWED", "仅可取消待签到预约。")
+    return record

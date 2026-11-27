@@ -1,0 +1,121 @@
+{
+  "result": "passed",
+  "source": "pytest.txt",
+  "source_sha256": "b8255d442943dee6f0423b50fca729a88474bfcee560fd419ddf3923c4b105d1",
+  "scenarios": [
+    {
+      "independent_connections": 2,
+      "responses": [
+        200,
+        200
+      ],
+      "scenario": "duplicate-checkin",
+      "write_transactions": 2
+    },
+    {
+      "independent_connections": 2,
+      "responses": [
+        200,
+        200
+      ],
+      "scenario": "duplicate-finish",
+      "write_transactions": 2
+    },
+    {
+      "independent_connections": 2,
+      "responses": [
+        200,
+        200
+      ],
+      "scenario": "duplicate-close",
+      "write_transactions": 2
+    },
+    {
+      "independent_connections": 2,
+      "responses": [
+        409,
+        200
+      ],
+      "scenario": "checkin-vs-close",
+      "write_transactions": 2
+    },
+    {
+      "independent_connections": 2,
+      "responses": [
+        409,
+        200
+      ],
+      "scenario": "booking-vs-close",
+      "write_transactions": 2
+    },
+    {
+      "independent_connections": 2,
+      "responses": [
+        0,
+        1
+      ],
+      "scenario": "duplicate-timeout",
+      "write_transactions": 2
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        201,
+        409
+      ],
+      "scenario": "same-seat"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        201,
+        409
+      ],
+      "scenario": "same-student"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        200,
+        201
+      ],
+      "scenario": "same-key"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 0,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        201,
+        409
+      ],
+      "scenario": "different-payload-key"
+    },
+    {
+      "begin_immediate_count": 2,
+      "cancel_audit_count": 1,
+      "create_audit_count": 1,
+      "independent_connections": 2,
+      "reservation_count": 1,
+      "responses": [
+        200,
+        200
+      ],
+      "scenario": "same-cancel"
+    }
+  ]
+}

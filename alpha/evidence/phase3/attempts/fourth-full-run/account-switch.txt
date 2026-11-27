@@ -1,0 +1,8 @@
+page.waitForFunction: Timeout 30000ms exceeded.
+    at contains (/private/tmp/studyseat-phase3-build/alpha/tests/account-switch.cjs:9:43)
+    at /private/tmp/studyseat-phase3-build/alpha/tests/account-switch.cjs:106:41
+    at async scenario (/private/tmp/studyseat-phase3-build/alpha/tests/account-switch.cjs:91:7)
+    at async /private/tmp/studyseat-phase3-build/alpha/tests/account-switch.cjs:98:5 {
+  log: [],
+  name: 'TimeoutError'
+}

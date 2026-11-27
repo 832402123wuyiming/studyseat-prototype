@@ -136,9 +136,9 @@ async function search(page) {
       const created = await saved;
       assert.equal(created.status(), 201);
       const record = (await created.json()).data;
-      await page.locator(`[data-reservation-id="${record.id}"]`).getByRole('button', { name: '取消预约' }).waitFor();
+      await page.locator(`[data-reservation-id="${record.id}"]`).getByRole('button', { name: '取消预约', exact: true }).waitFor();
       assert.equal(created.request().postDataJSON().start_at, start + ':00+08:00');
-      await page.locator(`[data-reservation-id="${record.id}"]`).getByRole('button', { name: '取消预约' }).click();
+      await page.locator(`[data-reservation-id="${record.id}"]`).getByRole('button', { name: '取消预约', exact: true }).click();
       await contains(page, 'status', '已取消');
     });
     for (const order of ['after', 'before']) await scenario(`B-old-seats-${order}-new-query`, async page => {

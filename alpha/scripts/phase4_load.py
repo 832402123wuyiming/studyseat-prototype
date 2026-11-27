@@ -73,7 +73,7 @@ def run_batch(name, workers, jobs, operation):
 
 
 def main():
-    out = Path(__file__).resolve().parents[1] / "evidence/phase4"
+    out = Path(__file__).resolve().parents[1] / "evidence/phase4-integration"
     out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="phase4-load-") as temporary:
         database = str(Path(temporary) / "load.db")

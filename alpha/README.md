@@ -1,16 +1,10 @@
-# StudySeat Alpha 第四阶段候选版本
+# StudySeat Alpha 使用与管理阶段
 
-第四阶段已通过 GitHub CLI 上传至 [832402123wuyiming/studyseat-prototype](https://github.com/832402123wuyiming/studyseat-prototype/tree/alpha-phase4-20261127) 的 `alpha-phase4-20261127` 分支，关联 [Issue #7](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/7) 与 [PR #8](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/8)。代码与实测证据提交为 [`9e5233d87df9`](https://github.com/832402123wuyiming/studyseat-prototype/commit/9e5233d87df975f36c9c029a818ec0b9f27ef4a5)。当前 PR 待审查，未合并或部署。
+当前已完成阶段一服务基础、阶段二预约与并发控制，并在已合并 PR #3 的主线基础上开发 11 月 25—26 日第三阶段。真实业务由 Flask 同源首页与 API 提供，SQLite 持久化；保留原型蓝白视觉和独立静态原型，不将原型模拟流程计作真实业务。
 
-第四阶段博客见 [Word 文档](docs/StudySeat-Alpha-Phase4-Blog.docx)，阶段记录见 [PHASE4.md](docs/PHASE4.md)。
+已实现登录与权限、查座、预约、取消、签到、暂离、返回、结束、独立超时任务，以及管理规则、开放安排、共享预约、资源关闭预览/确认、重新开放和审计。刷新、重登与相同配置重启可恢复已提交状态；工程验证文本工具继续保留。
 
-本次交付基于第三阶段 PR #4 的 `60f40e1` 源码快照，实际验证日期为 2026 年 11 月 27 日。新增统一回归、真实 HTTP 实测、SQLite 一致备份与交付文档。完整入口为 `python scripts/verify_phase4.py`。本轮后端及交付检查合计 114 项通过，六套浏览器用例通过。后端先全量运行113项，修正日志编码后补验4项交付检查，汇总JUnit按唯一用例去重，原始报告保留。详情见 [第四阶段交付](docs/DELIVERY.md) 和 [本次证据](evidence/phase4/verification.json)。以下保留前序阶段的启动与业务说明，历史测试数字不作为本轮结果。
-
-阶段一基线为已合并 PR #2（`f0fd0fc`），阶段二在 PR #3 完成查询、预约、取消和并发控制；本轮完成 **2026 年 11 月 25—26 日**日期段的签到、暂离、返回、结束、超时释放、管理员规则版本与资源关闭，实际开发验证日期为 11 月 25 日。保留原型蓝白视觉与独立静态原型，不将原型模拟流程计作真实业务。
-
-已实现：Flask 同源首页与 API、SQLite 文件持久化、服务端会话、CSRF、角色和归属校验、资源与版本规则读取、学生按房间/时段查询、创建预约、本人列表/详情、取消与释放、签到/暂离/返回/结束、服务端惰性超时释放、管理员规则新版本、资源关闭预览/确认/重开、关闭与操作审计，以及创建/取消/状态操作的写事务。页面访问真实接口，刷新、重登与相同配置重启可恢复预约和状态；阶段一的验证文本工具继续保留。
-
-契约见 [API-v1.md](docs/API-v1.md)，规则见 [RULES.md](docs/RULES.md)，阶段二结果见 [PHASE2.md](docs/PHASE2.md)，本轮结果、验收步骤与限制见 [PHASE3.md](docs/PHASE3.md)。
+运行和验收见 [PHASE3.md](docs/PHASE3.md)，契约见 [API-v1.md](docs/API-v1.md)，规则见 [RULES.md](docs/RULES.md)；历史结果保存在 [PHASE2.md](docs/PHASE2.md)。
 
 ## Windows 启动
 
@@ -64,13 +58,11 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 
 1. 访问首页与 `/api/v1/health`，学生 A 登录，选择 A101、明日北京时间 09:00—10:00 查询并预约 A01。
 2. 刷新、退出重登，预约仍在；用同样数据库和密钥重启服务后仍可恢复。
-3. 学生 B 登录，本人列表没有 A 的预约，不能读取、取消或操作 A 的记录，同座位重叠时段不能预约。
-4. A 在签到窗口内签到，随后暂离、返回并结束；重复操作不改变首次时间或重复审计。超过签到截止未签到的预约，刷新后显示已超时并释放座位。
-5. A 取消一条待签到预约，B 重新查询后能预约该座位原时段。管理员可查看同库的预约、状态与关闭审计。
-6. 管理员保存新规则版本，既有预约保留原快照；预览并关闭一个含待签到预约的座位，受影响预约取消；重开后不恢复，其他学生可重新预约。
-7. 使用后端用例复现独立连接竞争和状态迁移边界；不以页面按钮禁用作为并发保障。
+3. 学生 B 登录，本人列表没有 A 的预约，不能读取或取消 A 的记录，同座位重叠时段不能预约。
+4. A 取消，B 重新查询后能预约该座位原时段。管理员可查看同库的预约创建和取消审计。
+5. 使用后端并发用例复现两个独立连接的竞争；不以页面按钮禁用作为并发保障。
 
-资源目录数量不表示任意时段余量，查询结果也需创建时事务内复核。所有页面时间按北京时间显示，API 和数据库统一 UTC `Z`。提前 7 天按北京时间日历日计算，包含第七日；仅待签到预约可取消，状态操作以服务端时间与规则快照为准。详见 [规则](docs/RULES.md)。
+资源目录数量不表示任意时段余量，查询结果也需创建时事务内复核。所有页面时间按北京时间显示，API 和数据库统一 UTC `Z`。提前 7 天按北京时间日历日计算，包含第七日；仅待签到预约可取消。详见 [规则](docs/RULES.md)。
 
 ## 自动化验证
 
@@ -83,8 +75,6 @@ export STUDYSEAT_SECRET_KEY='replace-with-a-stable-random-secret-of-32-or-more-c
 ./.venv/Scripts/python.exe -m ruff format --check .
 ./.venv/Scripts/python.exe scripts/process_smoke.py
 ```
-
-阶段三记录使用 `python -m pytest -q --junitxml=evidence/phase3/pytest.xml`，完整后端结果为 110 passed、0 failed、0 skipped；Ruff、格式和 JS 语法检查通过，页面冒烟 13 项检查通过，证据见 [evidence/phase3](evidence/phase3/)。阶段二既有结果已在本轮复跑：后端 89 项、双进程冒烟 12 项、五套浏览器用例 36 项均通过，兼容性摘要见 [compatibility.json](evidence/phase3/compatibility.json)。阶段三浏览器用例：在仓库根目录安装 Playwright 依赖，使用独立测试库启动服务，设置 `STUDYSEAT_TEST_URL`（默认 `http://127.0.0.1:5057`）和可选的 `STUDYSEAT_EVIDENCE_DIR`，从根目录运行 `node alpha/tests/phase3-browser.cjs`。
 
 `process_smoke.py` 使用临时数据库、随机端口和两个真实子进程；验证预约、文本和会话跨进程恢复、重登恢复、创建重放、重复取消、B 预约释放时段与唯一审计。
 
@@ -105,14 +95,43 @@ python scripts/verify_phase2.py
 
 账号切换失败与延迟响应的补充回归：在独立测试数据库启动服务，设置 `STUDYSEAT_TEST_URL` 后从仓库根目录运行 `node alpha/tests/account-switch.cjs`。默认 Edge，可用 `STUDYSEAT_BROWSER_CHANNEL` 选择实际安装的浏览器；结果保存到 `alpha/evidence/account-switch/`。原浏览器脚本和进程重启脚本支持 `STUDYSEAT_EVIDENCE_DIR` 将本轮结果另存，保留历史报告。修复与实际验证见 [账号切换复核报告](docs/ACCOUNT-SWITCH-REVIEW.md)。
 
-`studyseat/api.py` 处理 HTTP；`auth.py` 处理认证、会话和权限；`db.py` 管理每请求独立连接与统一写事务；`schema.sql` 定义 v1 数据结构；`seed.py` 管理公开初始化数据；`reservations.py` 集中处理时间、规则、冲突及预约事务；`attendance.py` 处理签到、暂离、返回、结束和惰性超时释放；`admin.py` 处理规则版本、关闭预览/确认/重开。所有写入口使用 `BEGIN IMMEDIATE`，失败回滚，锁等待上限 5 秒，锁忙返回 503 和重试提示。数据库新增版本需新迁移，不能仅修改旧表声明。
+`studyseat/api.py` 处理 HTTP；`auth.py` 处理认证、会话和权限；`db.py` 管理每请求独立连接与统一写事务；`schema.sql` 定义 v1 数据结构；`seed.py` 管理公开初始化数据；`reservations.py` 集中处理时间、规则、冲突及预约事务。所有写入口使用 `BEGIN IMMEDIATE`，失败回滚，锁等待上限 5 秒，锁忙返回 503 和重试提示。数据库新增版本需新迁移，不能仅修改旧表声明。
 
-接口契约见 [docs/API-v1.md](docs/API-v1.md)，规则口径见 [docs/RULES.md](docs/RULES.md)，阶段任务、实测和限制见 [docs/PHASE3.md](docs/PHASE3.md)。
+接口契约见 [docs/API-v1.md](docs/API-v1.md)，规则口径见 [docs/RULES.md](docs/RULES.md)，阶段任务、实测和限制见 [docs/DAY1.md](docs/DAY1.md)。
 
-当前为本地开发与课程验收服务。签到、暂离、返回、结束、超时释放、管理员规则写入和资源关闭已实现；校园统一认证、真实通知、物理门禁和生产部署不在本轮范围。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。
+当前为本地开发与课程验收服务。阶段三已实现签到、暂离、返回、结束、独立超时任务、管理员规则写入、开放安排及资源关闭。公开部署前还需完成登录限速、生产 WSGI/HTTPS 配置和剩余业务验证。
 
-任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。当前账号对原仓库只有读取权限，因此推送至个人 Fork 后提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2、阶段二 PR #3 已合并；阶段三在本地基线 `07e6d64` 上完成多次提交（服务与测试、页面、文档与证据、悬停修复、浏览器用例），已发布到第三阶段 PR #4，当前仍打开，尚未合并或部署。非作者审查与正式验收待团队完成。
+任务和代码已发布至 GitHub：[D1-001 Issue #1](https://github.com/hoangthithang880-dotcom/studyseat-prototype/issues/1)、[功能提交 fd335ba](https://github.com/832402123wuyiming/studyseat-prototype/commit/fd335bafa329659a2b9cd91e1f048b75910e2677)、[PR #2](https://github.com/hoangthithang880-dotcom/studyseat-prototype/pull/2)。阶段一作者通过个人 Fork 提交 PR。AI 技术复核已修复 4 类问题，34 项后端测试和浏览器、重启回归通过，详情见 [技术复核报告](docs/REVIEW-D1-001.md)。阶段一 PR #2、阶段二 PR #3 均已合并。第三阶段目前为本地开发与验证，非作者审查与正式验收待团队完成。
 
 P2 独立审查修复了初始化期间编辑查询条件导致房间列表永久为空的问题。工作台加载期间查询控件禁用，失败时可点击“重新加载工作台”；条件编辑仅使旧余量查询失效。新增 `alpha/tests/initialization-browser.cjs` 已接入完整验证。复核时通过 `STUDYSEAT_EVIDENCE_DIR` 指定新证据目录，保留历史结果。缺陷与本轮证据见 [阶段二复核记录](docs/PHASE2.md#p2-独立审查前端初始化修复)。
 
 预约列表独立复查增加了同一身份下的列表请求版本保护。创建、取消成功后旧读取失效；手动刷新保留现有记录并显示加载提示，旧错误或按钮清理不干扰最新操作。新增 `alpha/tests/reservation-list-browser.cjs` 已纳入完整验证；本轮复现、修复和结果见 [列表乱序复查记录](docs/PHASE2.md#p2-预约列表乱序修复)。
+
+
+## 阶段三 使用与管理联动
+
+阶段二合并主线之后，在 `codex/phase3-attendance-admin` 开发。功能与验收见 [PHASE3](docs/PHASE3.md)，状态和接口见 [API](docs/API-v1.md)。原型目录仍是模拟演示；真实业务从本 Alpha 服务首页进入。
+
+已有阶段二数据库：先停服务并保留数据库与稳定密钥，备份数据库后使用原环境运行 `python -m flask --app studyseat init-db`，将 v1/v2 原子迁移到 v3，再启动服务。不要删库重建。首次使用仍按上文 `init-db --demo` 初始化。`schema.sql` 保留 v1 原声明，保留 `studyseat/migrations/002_phase3.sql` 并新增 `003_state_version.sql`；同一升级命令可重复执行，不重复生成数据。升级后旧代码不支持 v3，若需回退须停服务并恢复升级前备份。
+
+另一个终端使用相同 DATABASE 和 SECRET_KEY 环境启动独立超时进程：
+
+```sh
+python -m flask --app studyseat expire-reservations --watch --interval 30
+```
+
+单次补处理省略 `--watch`。任务不依赖浏览器；应用读取也补处理，因此任务暂停后重新运行可恢复。两个工作进程同时处理不会重复释放和记审计。实际状态以服务端为准，最多存在任务轮询间隔带来的处理延迟。
+
+完整验证（独立数据库，不接触日常实例）：
+
+```sh
+python scripts/verify_phase3.py
+```
+
+Node 与 Playwright 依赖及浏览器选择沿用阶段二。macOS 可设 `STUDYSEAT_BROWSER_CHANNEL=chrome`，Windows 默认 msedge。证据默认存放 `evidence/phase3/`，可用 `STUDYSEAT_EVIDENCE_DIR` 指向一个新的目录，历史阶段二报告不覆盖。验证包括全部后端、格式、原型测试、原有五组浏览器、阶段三跨端浏览器、真实 v1 升级/重启及两个独立超时进程。Windows/Edge 必须实际执行才能计为通过。
+
+本次独立审查修复：暂离/返回使用预约状态版本防止首次迟到请求作用于后续轮次；超时 watch 在临时锁竞争后由同一进程退避恢复；管理员保存验证文本只刷新验证记录和管理读取，保留等待期间的新规则草稿。升级前同时停止 HTTP 服务和任务进程，备份数据库；升级后刷新浏览器以读取新状态前提。不可恢复任务故障仍需操作者或外部进程监管恢复，本轮没有部署监管服务。完整验证已加入 phase3-review-browser.cjs 及真实锁恢复测试，运行时用 STUDYSEAT_EVIDENCE_DIR 指向新目录以保留历史证据。详情见 [独立审查修复记录](docs/PHASE3.md#独立审查修复)。
+
+## 第四阶段集成与合并前验证
+
+第四阶段基于已合并 PR #6 后的 main 328a3b3，保留本文件中全部 v3 升级和后台超时说明。执行 `python scripts/verify_phase4.py` 可复跑后端、七套浏览器、升级与真实进程恢复及 HTTP 实测，结果另存 evidence/phase4-integration。见 [阶段记录](docs/PHASE4.md)、[合并前审查](docs/PHASE4-MERGE-REVIEW.md) 和 [交付说明](docs/DELIVERY.md)。任务为 Issue #7，合并请求为 PR #8。历史 phase4 证据和 Word 博客是初次候选快照，不代表本次 main 集成结果。
